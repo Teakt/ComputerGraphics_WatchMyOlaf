@@ -212,7 +212,7 @@ int createVertexBufferObject()
 		3,                   // size
 		GL_FLOAT,            // type
 		GL_FALSE,            // normalized?
-		2 * sizeof(vec3), // stride - each vertex contain 2 vec3 (position, color)
+		2 * sizeof(vec3), // stride - each vertex contain 2 vec3 (position, color) 
 		(void*)0             // array buffer offset
 	);
 	glEnableVertexAttribArray(0);
@@ -382,6 +382,8 @@ int main(int argc, char*argv[])
 
 	// We can set the shader once, since we have only one
 	glUseProgram(shaderProgram);
+
+	//ahhh
 
 
 	// Camera parameters for view transform
@@ -584,7 +586,7 @@ int main(int argc, char*argv[])
 		{
 			cameraFirstPerson = false;
 		}
-
+		
 
 		// This was solution for Lab02 - Moving camera exercise
 		// We'll change this to be a first or third person camera
@@ -652,7 +654,14 @@ int main(int argc, char*argv[])
 		{
 			cameraPosition.y += currentCameraSpeed * dt * currentCameraSpeed;
 		}
-
+		if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS)
+			cameraPosition += cameraSpeed * cameraLookAt;
+		if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS)
+			cameraPosition -= cameraSpeed * cameraLookAt;
+		if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
+			cameraPosition -= glm::normalize(glm::cross(cameraLookAt, cameraUp)) * cameraSpeed;
+		if (glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS)
+			cameraPosition += glm::normalize(glm::cross(cameraLookAt, cameraUp)) * cameraSpeed;
 		// TODO 6
 		// Set the view matrix for first and third person cameras
 		// - In first person, camera lookat is set like below

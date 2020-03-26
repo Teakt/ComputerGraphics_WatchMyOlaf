@@ -160,6 +160,7 @@
   <ItemGroup>
     <ClCompile Include="ComputerGraphics_Teak_Assign1.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <DeploymentContent>false</DeploymentContent>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

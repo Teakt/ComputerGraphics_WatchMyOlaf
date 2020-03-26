@@ -232,51 +232,71 @@ int createVertexBufferObject()
 }
 
 
-int createVertexBufferObjectGrid()
+int createVertexBufferObjectGrid() // for the grid
 {
 	// Cube model
 	vec3 vertexArray[] = {  // position,                            color
-		vec3(-0.5f,-0.5f,-0.5f), vec3(1.0f, 0.0f, 0.0f), //left - red
-		vec3(-0.5f,-0.5f, 0.5f), vec3(1.0f, 0.0f, 0.0f),
-		vec3(-0.5f, 0.5f, 0.5f), vec3(1.0f, 0.0f, 0.0f),
+		vec3( 5.0f,0.0f,0.0f), vec3(0.0f, 1.0f, 0.0f), //left - green
+		vec3(-5.0f,0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f),
 
-		vec3(-0.5f,-0.5f,-0.5f), vec3(1.0f, 0.0f, 0.0f),
-		vec3(-0.5f, 0.5f, 0.5f), vec3(1.0f, 0.0f, 0.0f),
-		vec3(-0.5f, 0.5f,-0.5f), vec3(1.0f, 0.0f, 0.0f),
 
-		vec3(0.5f, 0.5f,-0.5f), vec3(0.0f, 0.0f, 1.0f), // far - blue
-		vec3(-0.5f,-0.5f,-0.5f), vec3(0.0f, 0.0f, 1.0f),
-		vec3(-0.5f, 0.5f,-0.5f), vec3(0.0f, 0.0f, 1.0f),
-
-		vec3(0.5f, 0.5f,-0.5f), vec3(0.0f, 0.0f, 1.0f),
-		vec3(0.5f,-0.5f,-0.5f), vec3(0.0f, 0.0f, 1.0f),
-		vec3(-0.5f,-0.5f,-0.5f), vec3(0.0f, 0.0f, 1.0f),
-
-		vec3(0.5f,-0.5f, 0.5f), vec3(0.0f, 1.0f, 1.0f), // bottom - turquoise
-		vec3(-0.5f,-0.5f,-0.5f), vec3(0.0f, 1.0f, 1.0f),
-		vec3(0.5f,-0.5f,-0.5f), vec3(0.0f, 1.0f, 1.0f),
-
-		vec3(0.5f,-0.5f, 0.5f), vec3(0.0f, 1.0f, 1.0f),
-		vec3(-0.5f,-0.5f, 0.5f), vec3(0.0f, 1.0f, 1.0f),
-		vec3(-0.5f,-0.5f,-0.5f), vec3(0.0f, 1.0f, 1.0f),
-
-		vec3(-0.5f, 0.5f, 0.5f), vec3(0.0f, 1.0f, 0.0f), // near - green
-		vec3(-0.5f,-0.5f, 0.5f), vec3(0.0f, 1.0f, 0.0f),
-		vec3(0.5f,-0.5f, 0.5f), vec3(0.0f, 1.0f, 0.0f),
-
-		vec3(0.5f, 0.5f, 0.5f), vec3(0.0f, 1.0f, 0.0f),
-		vec3(-0.5f, 0.5f, 0.5f), vec3(0.0f, 1.0f, 0.0f),
-		vec3(0.5f,-0.5f, 0.5f), vec3(0.0f, 1.0f, 0.0f),
-
-		vec3(0.5f, 0.5f, 0.5f), vec3(1.0f, 0.0f, 1.0f), // right - purple
-		vec3(0.5f,-0.5f,-0.5f), vec3(1.0f, 0.0f, 1.0f),
-		vec3(0.5f, 0.5f,-0.5f), vec3(1.0f, 0.0f, 1.0f),
-
-		vec3(0.5f,-0.5f,-0.5f), vec3(1.0f, 0.0f, 1.0f),
-		vec3(0.5f, 0.5f, 0.5f), vec3(1.0f, 0.0f, 1.0f),
-		vec3(0.5f,-0.5f, 0.5f), vec3(1.0f, 0.0f, 1.0f),
+	
 
 		
+	};
+
+
+	// Create a vertex array
+	GLuint vertexArrayObject;
+	glGenVertexArrays(1, &vertexArrayObject);
+	glBindVertexArray(vertexArrayObject);
+
+
+	// Upload Vertex Buffer to the GPU, keep a reference to it (vertexBufferObject)
+	GLuint vertexBufferObject;
+	glGenBuffers(1, &vertexBufferObject);
+	glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertexArray), vertexArray, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0,                   // attribute 0 matches aPos in Vertex Shader
+		3,                   // size
+		GL_FLOAT,            // type
+		GL_FALSE,            // normalized?
+		2 * sizeof(vec3), // stride - each vertex contain 2 vec3 (position, color)
+		(void*)0             // array buffer offset
+	);
+	glEnableVertexAttribArray(0);
+
+
+	glVertexAttribPointer(1,                            // attribute 1 matches aColor in Vertex Shader
+		3,
+		GL_FLOAT,
+		GL_FALSE,
+		2 * sizeof(vec3),
+		(void*)sizeof(vec3)      // color is offseted a vec3 (comes after position)
+	);
+	glEnableVertexAttribArray(1);
+
+
+	return vertexBufferObject;
+}
+
+
+int createVertexBufferObjectAxis() // for the grid
+{
+	// Cube model
+	vec3 vertexArray[] = {  // position,                            color
+		vec3(0.0f,0.0f,0.0f), vec3(1.0f, 0.0f, 1.0f), //purple
+		vec3(0.5f,0.0f, 0.0f), vec3(1.0f, 0.0f, 1.0f),
+
+		vec3(0.0f,0.0f,0.0f), vec3(1.0f, 1.0f, 0.0f), //cyan
+		vec3(0.0f,0.5f, 0.0f), vec3(1.0f, 1.0f, 0.0f),
+
+		vec3(0.0f,0.0f,0.0f), vec3(1.0f, 0.5f, 0.0f), //oranges
+		vec3(0.0f,0.0f, 0.5f), vec3(1.0f, 0.5f, 0.0f), 
+
+
+
 	};
 
 
@@ -399,6 +419,9 @@ int main(int argc, char*argv[])
 
 	// Define and upload geometry to the GPU here ...
 	int vbo = createVertexBufferObject();
+	int vbo_grid = createVertexBufferObjectGrid();
+	int vbo_axis = createVertexBufferObjectAxis();
+
 
 	// For frame time
 	float lastFrameTime = glfwGetTime();
@@ -416,23 +439,9 @@ int main(int argc, char*argv[])
 // Add the GL_DEPTH_BUFFER_BIT to glClear – TODO 1 
 
 
+	
 
-
-
-
-	unsigned int VAO;
-	glGenVertexArrays(1, &VAO);
-
-
-	GLfloat linesVertices[] = 
-	{
-		// positions          
-		 0.5f,  0.5f, 0.0f,   
-		 0.5f, -0.5f, 0.0f, 
-		-0.5f, -0.5f, 0.0f,  
-		-0.5f,  0.5f, 0.0f,  
-	};
-
+	
 
 	// Entering Main Loop
 	while (!glfwWindowShouldClose(window))
@@ -470,6 +479,52 @@ int main(int argc, char*argv[])
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 		*/
 
+		glBindVertexArray(vbo_grid);
+		glLineWidth(1.0f);
+
+
+
+		glDrawArrays(GL_LINES, 0,2);
+
+		mat4 gridWorldMatrix = mat4(1.0f);
+		for (int i = 0; i < 50; i++) {
+			gridWorldMatrix = translate(mat4(1.0f), vec3(0.0f , 0.0f, 0.0f + i * 0.1f) );
+			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &gridWorldMatrix[0][0]);
+			glDrawArrays(GL_LINES, 0, 2);	
+
+			gridWorldMatrix = translate(mat4(1.0f), vec3(0.0f, 0.0f, -0.0f + i * -0.1f));
+			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &gridWorldMatrix[0][0]);
+			glDrawArrays(GL_LINES, 0, 2);
+		}
+
+		
+		
+		mat4 rotatemat = rotate(gridWorldMatrix, radians(90.0f), vec3(0.0f, 1.0f, 0.0f));
+		
+		for (int i = 0; i < 50; i++) {
+			
+			gridWorldMatrix = translate(mat4(1.0f), vec3(0.0f + i * 0.1f, 0.0f,5.0f )) * rotatemat;
+			
+			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &gridWorldMatrix[0][0]);
+			
+			glDrawArrays(GL_LINES, 0, 2);
+
+			
+			gridWorldMatrix = translate(mat4(1.0f), vec3(-0.0f + i * -0.1f, 0.0f, 5.0f)) * rotatemat;
+
+			
+			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &gridWorldMatrix[0][0]);
+			glDrawArrays(GL_LINES, 0, 2);
+		}
+
+		glBindVertexArray(vbo_axis);
+		glLineWidth(3.0f);
+		mat4 axis_mat = mat4(1.0f) ;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &axis_mat[0][0]);
+
+		glDrawArrays(GL_LINES, 0, 6);
+
+		glBindVertexArray(vbo);
 		mat4 left_foot = translate(mat4(1.0f), vec3(-1.0f, 1.0f, 0.0f)) * scale(mat4(1.0f), vec3(1.0f, 0.5f, 0.5f));
 		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &left_foot[0][0]);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -501,6 +556,10 @@ int main(int argc, char*argv[])
 		mat4 hat = translate(mat4(1.0f), vec3(0.0f, 7.5f, 0.0f)) * scale(mat4(1.0f), vec3(0.5f, 1.0f, 1.0f));
 		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &hat[0][0]);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
+
+		
+		
+		
 
 		
 
@@ -630,10 +689,11 @@ int main(int argc, char*argv[])
 		lastMouseLeftState - glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
 		*/
 		
-
+		
 
 	}
 
+	
 
 	// Shutdown GLFW
 	glfwTerminate();
