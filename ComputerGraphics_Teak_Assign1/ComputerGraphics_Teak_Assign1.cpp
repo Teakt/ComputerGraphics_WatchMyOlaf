@@ -1,4 +1,4 @@
-//
+ï»¿//
 // COMP 371 Labs Framework
 //
 // Created by Nicolas Bergeron on 20/06/2019.
@@ -481,18 +481,51 @@ int main(int argc, char*argv[])
 			bodyMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(-5.0f + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (10.0f))), 0.0f, -5.0f + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (10.0f)))));
 		}
 
-		//The user can incrementally size up the Olaf by pressing ‘U’ for scale-up and ‘I’ for scale-down. Each key press should result in a small size change.
+		//The user can incrementally size up the Olaf by pressing â€˜Uâ€™ for scale-up and â€˜Iâ€™ for scale-down. Each key press should result in a small size change.
 		if (glfwGetKey(window, GLFW_KEY_U) == GLFW_PRESS)
 		{
 
 			bodyMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.00f,1.01f, 1.00f)) * bodyMatrix;
 		}
 
-		//The user can incrementally size up the Olaf by pressing ‘U’ for scale-up and ‘I’ for scale-down. Each key press should result in a small size change.
+		//The user can incrementally size up the Olaf by pressing â€˜Uâ€™ for scale-up and â€˜Iâ€™ for scale-down. Each key press should result in a small size change.
 		if (glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS)
 		{
 
 			bodyMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.00f, 0.99f, 1.00f)) * bodyMatrix;
+		}
+
+		//The user can control the Olaf position and orientation using keyboard input i.e. 
+		//A â†’ move left, D â†’ move right, W â†’ move up, S â†’ move down, a â†’ rotate left 5 degrees about Y axis, d â†’ rotate right 5 degrees about Y axis. You may add other rotations about other axis, if you want. 
+		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		{
+
+			bodyMatrix =  bodyMatrix * glm::translate(glm::mat4(1.0f), glm::vec3(-0.05f, 0.0f, 0.0f)) ;
+		}
+		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+		{
+
+			bodyMatrix = bodyMatrix * glm::translate(glm::mat4(1.0f), glm::vec3(0.05f, 0.0f, 0.0f));
+		}
+		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		{
+
+			bodyMatrix = bodyMatrix * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.05f));
+		}
+		if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS)
+		{
+
+			bodyMatrix = bodyMatrix * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -0.05f));
+		}
+		if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
+		{
+
+			bodyMatrix = bodyMatrix * glm::rotate(glm::mat4(1.0f), glm::radians(5.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		}
+		if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS)
+		{
+
+			bodyMatrix = bodyMatrix * glm::rotate(glm::mat4(1.0f), glm::radians(5.0f), glm::vec3(0.0f, -1.0f, 0.0f));
 		}
 
 
@@ -724,22 +757,22 @@ int main(int argc, char*argv[])
 
 		// View Transform
 
-		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) // move camera to the left
+		if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) // move camera to the left
 		{
 			cameraPosition.x -= currentCameraSpeed * dt;
 		}
 
-		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) // move camera to the right
+		if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) // move camera to the right
 		{
 			cameraPosition.x += currentCameraSpeed * dt;
 		}
 
-		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) // move camera up
+		if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) // move camera up
 		{
 			cameraPosition.y -= currentCameraSpeed * dt;
 		}
 
-		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) // move camera down
+		if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) // move camera down
 		{
 			cameraPosition.y += currentCameraSpeed * dt;
 		}
