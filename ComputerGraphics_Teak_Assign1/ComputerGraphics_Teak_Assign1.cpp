@@ -435,13 +435,15 @@ int main(int argc, char*argv[])
 		// first, we apply the part matrix, which specifies where the triangle lands in world space on it's own, when no special transformation is applied by the group or parent. the part matrix is unique for each part.
 		// in the context of the first assignment with the snowman, the part matrix is the one that has the role of making each cube into a specific part of the snowman (head, eye, torso, etc.), when the snowman rests at its default position (at the origin, with no scaling or rotation).
 		// here, we're just applying a scaling to the triangle such that it faces the camera
-	glm::mat4 partMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(-1.0f, 1.0f, 1.0f));
+	glm::mat4 partMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, 1.0f));
 
 	// second, we take the result of that, and apply another transformation on top of it with the group matrix. the group matrix is identical for all the parts. you can think of it as treating all the parts as if they made up a single model that you manipulate as one entity.
 	// in the context of the first assignment with the snowman, the group matrix is the one that allows you to interactively move around, scale and rotate yhe snowman.
 	// here, we're making all the triangles spin around the y axis (which in terms of the camera space is the "up" axis).
 	//glm::mat4 bodyMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
 	glm::mat4 bodyMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+
+
 	srand(static_cast <unsigned> (time(0)));
 	// Entering Main Loop
 	while (!glfwWindowShouldClose(window))
@@ -478,6 +480,21 @@ int main(int argc, char*argv[])
 			
 			bodyMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(-5.0f + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (10.0f))), 0.0f, -5.0f + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (10.0f)))));
 		}
+
+		//The user can incrementally size up the Olaf by pressing ‘U’ for scale-up and ‘I’ for scale-down. Each key press should result in a small size change.
+		if (glfwGetKey(window, GLFW_KEY_U) == GLFW_PRESS)
+		{
+
+			bodyMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.00f,1.01f, 1.00f)) * bodyMatrix;
+		}
+
+		//The user can incrementally size up the Olaf by pressing ‘U’ for scale-up and ‘I’ for scale-down. Each key press should result in a small size change.
+		if (glfwGetKey(window, GLFW_KEY_I) == GLFW_PRESS)
+		{
+
+			bodyMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.00f, 0.99f, 1.00f)) * bodyMatrix;
+		}
+
 
 		// finally we actually compute the world matrix using this!
 		// note that matrix composition notation is the reverse of the way we form sentences in english! "apply part matrix then group matrix" means "group matrix * part matrix"
