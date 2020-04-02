@@ -16,39 +16,14 @@
 #include <glm/glm.hpp>  // GLM is an optimized math library with syntax to similar to OpenGL Shading Language
 #include <glm/gtc/matrix_transform.hpp> // include this to create transformation matrices
 #include <glm/common.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
 
 
 using namespace glm;
 using namespace std;
 
-class Projectile
-{
-public:
-	Projectile(vec3 position, vec3 velocity, int shaderProgram) : mPosition(position), mVelocity(velocity)
-	{
-		mWorldMatrixLocation = glGetUniformLocation(shaderProgram, "worldMatrix");
 
-	}
-
-	void Update(float dt)
-	{
-		mPosition += mVelocity * dt;
-	}
-
-	void Draw() {
-		// this is a bit of a shortcut, since we have a single vbo, it is already bound
-		// let's just set the world matrix in the vertex shader
-
-		mat4 worldMatrix = translate(mat4(1.0f), mPosition) * rotate(mat4(1.0f), radians(180.0f), vec3(0.0f, 1.0f, 0.0f)) * scale(mat4(1.0f), vec3(0.2f, 0.2f, 0.2f));
-		glUniformMatrix4fv(mWorldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-	}
-
-private:
-	GLuint mWorldMatrixLocation;
-	vec3 mPosition;
-	vec3 mVelocity;
-};
 
 
 const char* getVertexShaderSource()
@@ -77,11 +52,12 @@ const char* getFragmentShaderSource()
 {
 	return
 		"#version 330 core\n"
+		"uniform vec3 objectColor;"
 		"in vec3 vertexColor;"
 		"out vec4 FragColor;"
 		"void main()"
 		"{"
-		"   FragColor = vec4(vertexColor.r, vertexColor.g, vertexColor.b, 1.0f);"
+		"   FragColor = vec4(objectColor.r, objectColor.g, objectColor.b, 1.0f);"
 		"}";
 }
 
@@ -144,7 +120,8 @@ int compileAndLinkShaders()
 
 int createVertexBufferObject()
 {
-	// Cube model
+	// A vertex is a point on a polygon, it contains positions and other data (eg: colors)
+	 // Cube model
 	vec3 vertexArray[] = {  // position,                            color
 		vec3(-0.5f,-0.5f,-0.5f), vec3(1.0f, 0.0f, 0.0f), //left - red
 		vec3(-0.5f,-0.5f, 0.5f), vec3(1.0f, 0.0f, 0.0f),
@@ -212,7 +189,7 @@ int createVertexBufferObject()
 		3,                   // size
 		GL_FLOAT,            // type
 		GL_FALSE,            // normalized?
-		2 * sizeof(vec3), // stride - each vertex contain 2 vec3 (position, color) 
+		2 * sizeof(vec3), // stride - each vertex contain 2 vec3 (position, color)
 		(void*)0             // array buffer offset
 	);
 	glEnableVertexAttribArray(0);
@@ -226,7 +203,6 @@ int createVertexBufferObject()
 		(void*)sizeof(vec3)      // color is offseted a vec3 (comes after position)
 	);
 	glEnableVertexAttribArray(1);
-
 
 	return vertexBufferObject;
 }
@@ -353,7 +329,7 @@ int main(int argc, char*argv[])
 #endif
 
 	// Create Window and rendering context using GLFW, resolution is 800x600
-	GLFWwindow* window = glfwCreateWindow(1024, 768, "OLAFFFF", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(1024, 768, "Olaafff", NULL, NULL);
 	if (window == NULL)
 	{
 		std::cerr << "Failed to create GLFW window" << std::endl;
@@ -375,7 +351,7 @@ int main(int argc, char*argv[])
 
 	// Black background
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT);
+	
 
 	// Compile and link shaders here ...
 	int shaderProgram = compileAndLinkShaders();
@@ -420,7 +396,7 @@ int main(int argc, char*argv[])
 
 
 	// Define and upload geometry to the GPU here ...
-	int vbo = createVertexBufferObject();
+	int vbo_cube = createVertexBufferObject();
 	int vbo_grid = createVertexBufferObjectGrid();
 	int vbo_axis = createVertexBufferObjectAxis();
 
@@ -431,26 +407,30 @@ int main(int argc, char*argv[])
 	double lastMousePosX, lastMousePosY;
 	glfwGetCursorPos(window, &lastMousePosX, &lastMousePosY);
 
+
+	// Variables to be used later in tutorial
+	float angle = 0;
+	float rotationSpeed = 180.0f;  // 180 degrees per second
+	
+
 	// Other OpenGL states to set once
 	// Enable Backface culling
 	glEnable(GL_CULL_FACE);
 
 	// @TODO 1 - Enable Depth Test
 	// ...
-	glEnable(GL_DEPTH_TEST); // @TODO 1 // Add the GL_DEPTH_BUFFER_BIT to glClear – TODO 1 
-// Add the GL_DEPTH_BUFFER_BIT to glClear – TODO 1 
+	glEnable(GL_DEPTH_TEST); 
 
 
-	
 
 	
+
+	GLuint colorLocation = glGetUniformLocation(shaderProgram, "objectColor");
 
 	// Entering Main Loop
 	while (!glfwWindowShouldClose(window))
 	{
-		// Frame time calculation
-		float dt = glfwGetTime() - lastFrameTime;
-		lastFrameTime += dt;
+		
 
 		// Each frame, reset color of each pixel to glClearColor
 
@@ -459,43 +439,171 @@ int main(int argc, char*argv[])
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
-		// Draw geometry
-		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		
+		
 
+		glBindVertexArray(vbo_cube);
+		
+		// Frame time calculation
+		float dt = glfwGetTime() - lastFrameTime;
+		lastFrameTime += dt;
+
+		
+
+		angle = (angle + rotationSpeed * dt); // angles in degrees, but glm expects radians (conversion below)
+
+
+		// the position of each piece is computed using hierarchical modeling
+
+		// first, we apply the part matrix, which specifies where the triangle lands in world space on it's own, when no special transformation is applied by the group or parent. the part matrix is unique for each part.
+		// in the context of the first assignment with the snowman, the part matrix is the one that has the role of making each cube into a specific part of the snowman (head, eye, torso, etc.), when the snowman rests at its default position (at the origin, with no scaling or rotation).
+		// here, we're just applying a scaling to the triangle such that it faces the camera
+		glm::mat4 partMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(-1.0f, 1.0f, 1.0f));
+
+		// second, we take the result of that, and apply another transformation on top of it with the group matrix. the group matrix is identical for all the parts. you can think of it as treating all the parts as if they made up a single model that you manipulate as one entity.
+		// in the context of the first assignment with the snowman, the group matrix is the one that allows you to interactively move around, scale and rotate yhe snowman.
+		// here, we're making all the triangles spin around the y axis (which in terms of the camera space is the "up" axis).
+		//glm::mat4 bodyMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
+		glm::mat4 bodyMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+
+		// finally we actually compute the world matrix using this!
+		// note that matrix composition notation is the reverse of the way we form sentences in english! "apply part matrix then group matrix" means "group matrix * part matrix"
+		glm::mat4 worldMatrix = bodyMatrix * partMatrix;
+
+		// in a full fledged hierarchical modeling implementation, instead of "group" and "part", you would have "parent" and "child" and a tree data structure that relates objects together.
+		// the way the maths extend is pretty simple: we go from "worldMatrix = parentMatrix * childMatrix" to "worldMatrix = ... grandParentMatrix * parentMatrix * childMatrix * grandChildMatrix ..."
+
+
+		
+		
 		GLuint worldMatrixLocation = glGetUniformLocation(shaderProgram, "worldMatrix");
+
+
+		// drawing the feet left
+		glm::mat4 scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.2f, -0.2f, 0.175f));
+		glm::mat4 translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(-0.15f, 0.1f, 0.0f));
+
+		partMatrix = translationMatrix * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
+
+		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
+
+		// drawing the feet right
+		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.2f, -0.2f, 0.175f));
+		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.15f, 0.1f, 0.0f));
+
+		partMatrix = translationMatrix * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
+
+		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
+
+
+		// drawing the body
+		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.6f, -1.0f, 0.2f));
+		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.6f, 0.0f));
+
+		partMatrix = translationMatrix * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
+
+		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
+
+		// drawing the body upper
+		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.4f, -0.25f, 0.2f));
+		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.2f, 0.0f));
+
+		partMatrix = translationMatrix * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
+
+		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
+
+		// drawing the head
+		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.3f, 0.25f, 0.2f));
+		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.4f, 0.0f));
+
+		partMatrix = translationMatrix * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
+
+		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
+
+		// drawing the nose
+		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.05f, 0.05f, 0.05f));
+		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.4f, 0.1f));
+
+		partMatrix = translationMatrix * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 0.0, 1.0)));
+
+		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
+
+		// drawing the hat
+		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f, -0.25f, 0.1f));
+		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.6f, 0.0f));
+
+		partMatrix = translationMatrix * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 0.0, 0.0)));
+
+		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
+
+		// drawing the left arm
+		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, -0.075f, 0.1f));
+		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(-0.4f, 1.2f, 0.0f));
+
+		partMatrix = translationMatrix * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
+
+		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
+
+		// drawing the right arm
+		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, -0.075f, 0.1f));
+		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.4f, 1.2f, 0.0f));
+
+		partMatrix = translationMatrix * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
+
+		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
+
+		
+
+		
+
+		
 	
-		
-		// Draw grid
-		/*
-		mat4 groundWorldMatrix = translate(mat4(1.0f), vec3(0.0f, -0.01f, 0.0f)) * scale(mat4(1.0f), vec3(100.0f, 0.02f, 100.0f));
-		
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &groundWorldMatrix[0][0]);
-		
 
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-		*/
-		// Draw pillars
-		/*
-		mat4 pillarWorldMatrix = translate(mat4(1.0f), vec3(0.0f, 5.0f, 0.0f)) * scale(mat4(1.0f), vec3(2.0f, 20.0f, 2.0f));
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &pillarWorldMatrix[0][0]);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-		*/
-
+		//grid
 		glBindVertexArray(vbo_grid);
 		glLineWidth(1.0f);
 
 
 
-		glDrawArrays(GL_LINES, 0,2);
+		
 
 		mat4 gridWorldMatrix = mat4(1.0f);
 		for (int i = 0; i < 50; i++) {
 			gridWorldMatrix = translate(mat4(1.0f), vec3(0.0f , 0.0f, 0.0f + i * 0.1f) );
 			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &gridWorldMatrix[0][0]);
+			glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 0.0)));
 			glDrawArrays(GL_LINES, 0, 2);	
 
 			gridWorldMatrix = translate(mat4(1.0f), vec3(0.0f, 0.0f, -0.0f + i * -0.1f));
 			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &gridWorldMatrix[0][0]);
+			glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 0.0)));
 			glDrawArrays(GL_LINES, 0, 2);
 		}
 
@@ -508,7 +616,7 @@ int main(int argc, char*argv[])
 			gridWorldMatrix = translate(mat4(1.0f), vec3(0.0f + i * 0.1f, 0.0f,5.0f )) * rotatemat;
 			
 			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &gridWorldMatrix[0][0]);
-			
+			glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 0.0)));
 			glDrawArrays(GL_LINES, 0, 2);
 
 			
@@ -516,51 +624,27 @@ int main(int argc, char*argv[])
 
 			
 			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &gridWorldMatrix[0][0]);
+			glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 0.0)));
 			glDrawArrays(GL_LINES, 0, 2);
 		}
+
+		// axis 
 
 		glBindVertexArray(vbo_axis);
 		glLineWidth(3.0f);
 		mat4 axis_mat = mat4(1.0f) ;
 		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &axis_mat[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 0.5, 1.0)));
+		glDrawArrays(GL_LINES, 0, 2);
 
-		glDrawArrays(GL_LINES, 0, 6);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 1.0)));
+		glDrawArrays(GL_LINES, 2, 4);
 
-		glBindVertexArray(vbo);
-		mat4 left_foot = translate(mat4(1.0f), vec3(-1.0f, 1.0f, 0.0f)) * scale(mat4(1.0f), vec3(1.0f, 0.5f, 0.5f));
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &left_foot[0][0]);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 0.0, 1.0)));
+		glDrawArrays(GL_LINES, 4, 6);
 
-		mat4 right_foot = translate(mat4(1.0f), vec3(1.0f, 1.0f, 0.0f)) * scale(mat4(1.0f), vec3(1.0f, 0.5f, 0.5f));
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &right_foot[0][0]);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
 
-		mat4 body = translate(mat4(1.0f), vec3(0.0f, 3.0f, 0.0f)) * scale(mat4(1.0f), vec3(4.0f, 4.0f, 1.0f));
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &body[0][0]);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
 
-		mat4 upperbody = translate(mat4(1.0f), vec3(0.0f, 5.5f, 0.0f)) * scale(mat4(1.0f), vec3(3.0f, 1.0f, 1.0f));
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &upperbody[0][0]);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-
-		mat4 left_arm = translate(mat4(1.0f), vec3(-1.0f, 5.5f, 0.0f)) * scale(mat4(1.0f), vec3(6.0f, 0.3f, 0.5f));
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &left_arm[0][0]);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-
-		mat4 right_arm = translate(mat4(1.0f), vec3(1.0f, 5.5f, 0.0f)) * scale(mat4(1.0f), vec3(6.0f, 0.3f, 0.5f));
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &right_arm[0][0]);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-		
-		mat4 head = translate(mat4(1.0f), vec3(0.0f, 6.5f, 0.0f)) * scale(mat4(1.0f), vec3(2.0f, 1.0f, 1.0f));
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &head[0][0]);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-
-		mat4 hat = translate(mat4(1.0f), vec3(0.0f, 7.5f, 0.0f)) * scale(mat4(1.0f), vec3(0.5f, 1.0f, 1.0f));
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &hat[0][0]);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-
-		
-		
 		
 
 		
@@ -571,132 +655,91 @@ int main(int argc, char*argv[])
 
 		// End Frame
 		glfwSwapBuffers(window);
+		
+
+		// Detect inputs
 		glfwPollEvents();
 
-		// Handle inputs
+		//Handle inputs
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 			glfwSetWindowShouldClose(window, true);
 
-		if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) // move camera down
+
+
+
+
+		// Projection Transform
+		if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
 		{
-			cameraFirstPerson = true;
+			glm::mat4 projectionMatrix = glm::perspective(glm::radians(45.0f),  // field of view in degrees
+				800.0f / 600.0f,      // aspect ratio
+				0.01f, 100.0f);       // near and far (near > 0)
+
+			GLuint projectionMatrixLocation = glGetUniformLocation(shaderProgram, "projectionMatrix");
+			glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, &projectionMatrix[0][0]);
 		}
 
-		if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) // move camera down
+		if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS)
 		{
-			cameraFirstPerson = false;
-		}
-		
+			glm::mat4 projectionMatrix = glm::ortho(-4.0f, 4.0f,    // left/right
+				-3.0f, 3.0f,    // bottom/top
+				-100.0f, 100.0f);  // near/far (near == 0 is ok for ortho)
 
-		// This was solution for Lab02 - Moving camera exercise
-		// We'll change this to be a first or third person camera
+			GLuint projectionMatrixLocation = glGetUniformLocation(shaderProgram, "projectionMatrix");
+			glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, &projectionMatrix[0][0]);
+		}
+
 		bool fastCam = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
 		float currentCameraSpeed = (fastCam) ? cameraFastSpeed : cameraSpeed;
 
+		// View Transform
 
-		// @TODO 4 - Calculate mouse motion dx and dy
-		//         - Update camera horizontal and vertical angle
-
-
-
-		double mousePosX, mousePosY;
-		glfwGetCursorPos(window, &mousePosX, &mousePosY);
-
-		double dx = mousePosX - lastMousePosX;
-		double dy = mousePosY - lastMousePosY;
-
-		lastMousePosX = mousePosX;
-		lastMousePosY = mousePosY;
-
-		// Convert to spherical coordinates
-		const float cameraAngularSpeed = 60.0f;
-		cameraHorizontalAngle -= dx * cameraAngularSpeed * dt;
-		cameraVerticalAngle -= dy * cameraAngularSpeed * dt;
-
-		// Clamp vertical angle to [-85, 85] degrees
-		cameraVerticalAngle = std::fmax(-85.0f, std::fmin(85.0f, cameraVerticalAngle));
-		if (cameraHorizontalAngle > 360)
-		{
-			cameraHorizontalAngle -= 360;
-		}
-		else if (cameraHorizontalAngle < -360)
-		{
-			cameraHorizontalAngle += 360;
-		}
-
-		float theta = radians(cameraHorizontalAngle);
-		float phi = radians(cameraVerticalAngle);
-
-		cameraLookAt = vec3(cosf(phi)*cosf(theta), sinf(phi), -cosf(phi)*sinf(theta));
-		vec3 cameraSideVector = glm::cross(cameraLookAt, vec3(0.0f, 1.0f, 0.0f));
-
-		glm::normalize(cameraSideVector);
-
-
-		// @TODO 5 = use camera lookat and side vectors to update positions with ASDW
-		// adjust code below
 		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) // move camera to the left
 		{
-			cameraPosition.x -= currentCameraSpeed * dt * currentCameraSpeed;
+			cameraPosition.x -= currentCameraSpeed * dt;
 		}
 
 		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) // move camera to the right
 		{
-			cameraPosition.x += currentCameraSpeed * dt* currentCameraSpeed;
+			cameraPosition.x += currentCameraSpeed * dt;
 		}
 
 		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) // move camera up
 		{
-			cameraPosition.y -= currentCameraSpeed * dt * currentCameraSpeed;
+			cameraPosition.y -= currentCameraSpeed * dt;
 		}
 
 		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) // move camera down
 		{
-			cameraPosition.y += currentCameraSpeed * dt * currentCameraSpeed;
+			cameraPosition.y += currentCameraSpeed * dt;
 		}
-		if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS)
-			cameraPosition += cameraSpeed * cameraLookAt;
-		if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS)
-			cameraPosition -= cameraSpeed * cameraLookAt;
-		if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS)
-			cameraPosition -= glm::normalize(glm::cross(cameraLookAt, cameraUp)) * cameraSpeed;
-		if (glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS)
-			cameraPosition += glm::normalize(glm::cross(cameraLookAt, cameraUp)) * cameraSpeed;
-		// TODO 6
-		// Set the view matrix for first and third person cameras
-		// - In first person, camera lookat is set like below
-		// - In third person, camera position is on a sphere looking towards center
 
-		mat4 viewMatrix(1.0f);
-
-		if (cameraFastSpeed) {
-			viewMatrix = lookAt(cameraPosition, cameraPosition + cameraLookAt, cameraUp);
-
+		if (glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS) // move camera backward
+		{
+			cameraPosition.z -= currentCameraSpeed * dt;
 		}
-		else {
-			float radius = 5.0f;
-			vec3 position = cameraPosition - vec3(radius* cosf(phi) * cosf(theta),
-				radius * sinf(phi),
-				-radius * cosf(phi)*sinf(theta));
-			viewMatrix = lookAt(position, cameraPosition, cameraUp);
+
+		if (glfwGetKey(window, GLFW_KEY_Y) == GLFW_PRESS) // move camera forward
+		{
+			cameraPosition.z += currentCameraSpeed * dt;
 		}
+
+		if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) // move camera left
+		{
+			cameraLookAt.x -= currentCameraSpeed * dt;
+		}
+
+		if (glfwGetKey(window, GLFW_KEY_J) == GLFW_PRESS) // move camera right
+		{
+			cameraLookAt.x += currentCameraSpeed * dt;
+		}
+
+		mat4 viewMatrix = lookAt(cameraPosition, cameraPosition + cameraLookAt, cameraUp);
+
 		GLuint viewMatrixLocation = glGetUniformLocation(shaderProgram, "viewMatrix");
 		glUniformMatrix4fv(viewMatrixLocation, 1, GL_FALSE, &viewMatrix[0][0]);
 
 
-		// @TODO 2 - Shoot Projectiles
-		//
-		// shoot projectiles on mouse left click
-		// To detect onPress events, we need to check the last state and the current state to detect the state change
-		// Otherwise, you would shoot many projectiles on each mouse press
-		// ...
-		/*
-		if (lastMouseLeftState == GLFW_RELEASE && glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-			const float projectileSpeed = 25.0f;
-			projectileList.push_back(Projectile(cameraPosition, projectileSpeed * cameraLookAt, shaderProgram));
-		}
-		lastMouseLeftState - glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
-		*/
 		
 		
 
