@@ -6,6 +6,10 @@
 
 #include <iostream>
 #include <list>
+#include <iostream>
+#include <sstream>
+#include <iomanip>
+#include <fstream>
 
 #define GLEW_STATIC 1   // This allows linking with Static Library on Windows, without DLL
 #include <GL/glew.h>    // Include GLEW - OpenGL Extension Wrangler
@@ -19,13 +23,15 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <cstdlib>
 #include <ctime>
+#include <Sphere.h>
+
+#include <shader.h>
+
 
 
 
 using namespace glm;
 using namespace std;
-
-
 
 
 const char* getVertexShaderSource()
@@ -35,7 +41,13 @@ const char* getVertexShaderSource()
 		"#version 330 core\n"
 		"layout (location = 0) in vec3 aPos;"
 		"layout (location = 1) in vec3 aColor;"
+		"layout (location = 2) in vec3 aNormal;"
 		""
+		"out vec3 FragPos;"
+		"out vec3 Normal;"
+		"out vec3 LightPos;"
+		""
+		"uniform vec3 lightPos;"
 		"uniform mat4 worldMatrix;"
 		"uniform mat4 viewMatrix = mat4(1.0);"  // default value for view matrix (identity)
 		"uniform mat4 projectionMatrix = mat4(1.0);"
@@ -43,9 +55,12 @@ const char* getVertexShaderSource()
 		"out vec3 vertexColor;"
 		"void main()"
 		"{"
-		"   vertexColor = aColor;"
+		""
 		"   mat4 modelViewProjection = projectionMatrix * viewMatrix * worldMatrix;"
 		"   gl_Position = modelViewProjection * vec4(aPos.x, aPos.y, aPos.z, 1.0);"
+		" FragPos = vec3(viewMatrix * worldMatrix * vec4(aPos, 1.0));"
+		"Normal = mat3(transpose(inverse(viewMatrix * worldMatrix))) * aNormal;"
+		"LightPos = vec3(viewMatrix * vec4(lightPos, 1.0));"
 		"}";
 }
 
@@ -57,9 +72,20 @@ const char* getFragmentShaderSource()
 		"uniform vec3 objectColor;"
 		"in vec3 vertexColor;"
 		"out vec4 FragColor;"
+		"in vec3 FragPos;"
+		"in vec3 Normal;"
+		"in vec3 LightPos;"   // extra in variable, since we need the light position in view space we calculate this in the vertex shader
+		""
+		"uniform vec3 lightColor;"
+		//"uniform vec3 objectColor;"
 		"void main()"
 		"{"
-		"   FragColor = vec4(objectColor.r, objectColor.g, objectColor.b, 1.0f);"
+			//"   FragColor = vec4(objectColor.r, objectColor.g, objectColor.b, 1.0f);"
+			"float ambientStrength = 0.1;"
+			"vec3 ambient = ambientStrength * lightColor;"
+		"FragColor = vec4(lightColor * objectColor, 1.0);"
+
+		
 		"}";
 }
 
@@ -118,6 +144,98 @@ int compileAndLinkShaders()
 
 	return shaderProgram;
 }
+
+int lightVAO()
+{
+	vec3 vertexArray[] = {  // position,                            color
+		vec3(-0.5f,-0.5f,-0.5f), vec3(1.0f, 0.0f, 0.0f), //left - red
+		vec3(-0.5f,-0.5f, 0.5f), vec3(1.0f, 0.0f, 0.0f),
+		vec3(-0.5f, 0.5f, 0.5f), vec3(1.0f, 0.0f, 0.0f),
+
+		vec3(-0.5f,-0.5f,-0.5f), vec3(1.0f, 0.0f, 0.0f),
+		vec3(-0.5f, 0.5f, 0.5f), vec3(1.0f, 0.0f, 0.0f),
+		vec3(-0.5f, 0.5f,-0.5f), vec3(1.0f, 0.0f, 0.0f),
+
+		vec3(0.5f, 0.5f,-0.5f), vec3(0.0f, 0.0f, 1.0f), // far - blue
+		vec3(-0.5f,-0.5f,-0.5f), vec3(0.0f, 0.0f, 1.0f),
+		vec3(-0.5f, 0.5f,-0.5f), vec3(0.0f, 0.0f, 1.0f),
+
+		vec3(0.5f, 0.5f,-0.5f), vec3(0.0f, 0.0f, 1.0f),
+		vec3(0.5f,-0.5f,-0.5f), vec3(0.0f, 0.0f, 1.0f),
+		vec3(-0.5f,-0.5f,-0.5f), vec3(0.0f, 0.0f, 1.0f),
+
+		vec3(0.5f,-0.5f, 0.5f), vec3(0.0f, 1.0f, 1.0f), // bottom - turquoise
+		vec3(-0.5f,-0.5f,-0.5f), vec3(0.0f, 1.0f, 1.0f),
+		vec3(0.5f,-0.5f,-0.5f), vec3(0.0f, 1.0f, 1.0f),
+
+		vec3(0.5f,-0.5f, 0.5f), vec3(0.0f, 1.0f, 1.0f),
+		vec3(-0.5f,-0.5f, 0.5f), vec3(0.0f, 1.0f, 1.0f),
+		vec3(-0.5f,-0.5f,-0.5f), vec3(0.0f, 1.0f, 1.0f),
+
+		vec3(-0.5f, 0.5f, 0.5f), vec3(0.0f, 1.0f, 0.0f), // near - green
+		vec3(-0.5f,-0.5f, 0.5f), vec3(0.0f, 1.0f, 0.0f),
+		vec3(0.5f,-0.5f, 0.5f), vec3(0.0f, 1.0f, 0.0f),
+
+		vec3(0.5f, 0.5f, 0.5f), vec3(0.0f, 1.0f, 0.0f),
+		vec3(-0.5f, 0.5f, 0.5f), vec3(0.0f, 1.0f, 0.0f),
+		vec3(0.5f,-0.5f, 0.5f), vec3(0.0f, 1.0f, 0.0f),
+
+		vec3(0.5f, 0.5f, 0.5f), vec3(1.0f, 0.0f, 1.0f), // right - purple
+		vec3(0.5f,-0.5f,-0.5f), vec3(1.0f, 0.0f, 1.0f),
+		vec3(0.5f, 0.5f,-0.5f), vec3(1.0f, 0.0f, 1.0f),
+
+		vec3(0.5f,-0.5f,-0.5f), vec3(1.0f, 0.0f, 1.0f),
+		vec3(0.5f, 0.5f, 0.5f), vec3(1.0f, 0.0f, 1.0f),
+		vec3(0.5f,-0.5f, 0.5f), vec3(1.0f, 0.0f, 1.0f),
+
+		vec3(0.5f, 0.5f, 0.5f), vec3(1.0f, 1.0f, 0.0f), // top - yellow
+		vec3(0.5f, 0.5f,-0.5f), vec3(1.0f, 1.0f, 0.0f),
+		vec3(-0.5f, 0.5f,-0.5f), vec3(1.0f, 1.0f, 0.0f),
+
+		vec3(0.5f, 0.5f, 0.5f), vec3(1.0f, 1.0f, 0.0f),
+		vec3(-0.5f, 0.5f,-0.5f), vec3(1.0f, 1.0f, 0.0f),
+		vec3(-0.5f, 0.5f, 0.5f), vec3(1.0f, 1.0f, 0.0f)
+	};
+	// first, configure the cube's VAO (and VBO)
+	GLuint VBO, cubeVAO;
+	glGenVertexArrays(1, &cubeVAO);
+	glGenBuffers(1, &VBO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertexArray), vertexArray, GL_STATIC_DRAW);
+
+	glBindVertexArray(cubeVAO);
+
+	glVertexAttribPointer(0,                   // attribute 0 matches aPos in Vertex Shader
+		3,                   // size
+		GL_FLOAT,            // type
+		GL_FALSE,            // normalized?
+		2 * sizeof(glm::vec3), // stride - each vertex contain 2 vec3 (position, color)
+		(void*)0             // array buffer offset
+	);
+	glEnableVertexAttribArray(0);
+
+	// second, configure the light's VAO (VBO stays the same; the vertices are the same for the light object which is also a 3D cube)
+	GLuint lightVAO;
+	glGenVertexArrays(1, &lightVAO);
+	glBindVertexArray(lightVAO);
+
+	// we only need to bind to the VBO (to link it with glVertexAttribPointer), no need to fill it; the VBO's data already contains all we need (it's already bound, but we do it again for educational purposes)
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+
+	glVertexAttribPointer(0,                   // attribute 0 matches aPos in Vertex Shader
+		3,                   // size
+		GL_FLOAT,            // type
+		GL_FALSE,            // normalized?
+		2 * sizeof(glm::vec3), // stride - each vertex contain 2 vec3 (position, color)
+		(void*)0             // array buffer offset
+	);
+	glEnableVertexAttribArray(0);
+
+
+	return lightVAO;
+}
+
 
 
 int createVertexBufferObject()
@@ -210,12 +328,56 @@ int createVertexBufferObject()
 }
 
 
+
+int createVertexBufferObject_Sphere() {
+	// create a sphere with default params; radius=1, sectors=36, stacks=18, smooth=true
+	Sphere sphere;
+
+	// copy interleaved vertex data (V/N/T) to VBO
+	GLuint vboId;
+	glGenBuffers(1, &vboId);
+	glBindBuffer(GL_ARRAY_BUFFER, vboId);           // for vertex data
+	glBufferData(GL_ARRAY_BUFFER,                   // target
+		sphere.getInterleavedVertexSize(), // data size, # of bytes
+		sphere.getInterleavedVertices(),   // ptr to vertex data
+		GL_STATIC_DRAW);                   // usage
+
+// copy index data to VBO
+	GLuint iboId;
+	glGenBuffers(1, &iboId);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboId);   // for index data
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER,           // target
+		sphere.getIndexSize(),             // data size, # of bytes
+		sphere.getIndices(),               // ptr to index data
+		GL_STATIC_DRAW);                   // usage
+	
+
+
+		// bind VBOs
+		glBindBuffer(GL_ARRAY_BUFFER, vboId);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboId);
+
+	// activate attrib arrays
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
+
+	// set attrib arrays with stride and offset
+	int stride = sphere.getInterleavedStride();     // should be 32 bytes
+	glVertexAttribPointer(0, 3, GL_FLOAT, false, stride, (void*)0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, false, stride, (void*)(sizeof(float) * 3));
+	glVertexAttribPointer(2, 2, GL_FLOAT, false, stride, (void*)(sizeof(float) * 6));
+
+	return iboId; 
+
+}
+
 int createVertexBufferObjectGrid() // for the grid
 {
 	// Cube model
 	vec3 vertexArray[] = {  // position,                            color
 		vec3( 5.0f,0.0f,0.0f), vec3(0.0f, 1.0f, 0.0f), //left - green
-		vec3(-5.0f,0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f),
+		vec3(-5.0f,0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f)
 
 
 	
@@ -271,7 +433,7 @@ int createVertexBufferObjectAxis() // for the grid
 		vec3(0.0f,0.5f, 0.0f), vec3(1.0f, 1.0f, 0.0f),
 
 		vec3(0.0f,0.0f,0.0f), vec3(1.0f, 0.5f, 0.0f), //oranges
-		vec3(0.0f,0.0f, 0.5f), vec3(1.0f, 0.5f, 0.0f), 
+		vec3(0.0f,0.0f, 0.5f), vec3(1.0f, 0.5f, 0.0f)
 
 
 
@@ -357,6 +519,10 @@ int main(int argc, char*argv[])
 
 	// Compile and link shaders here ...
 	int shaderProgram = compileAndLinkShaders();
+	// build and compile our shader zprogram
+   // ------------------------------------
+	Shader lightingShader("1.colors.vs", "1.colors.fs");
+	Shader lampShader("1.lamp.vs", "1.lamp.fs");
 
 	// We can set the shader once, since we have only one
 	glUseProgram(shaderProgram);
@@ -401,7 +567,8 @@ int main(int argc, char*argv[])
 	int vbo_cube = createVertexBufferObject();
 	int vbo_grid = createVertexBufferObjectGrid();
 	int vbo_axis = createVertexBufferObjectAxis();
-
+	int vbo_sphere = createVertexBufferObject_Sphere();
+	int vao_light = lightVAO();
 
 	// For frame time
 	float lastFrameTime = glfwGetTime();
@@ -445,6 +612,8 @@ int main(int argc, char*argv[])
 
 
 	srand(static_cast <unsigned> (time(0)));
+
+	
 	// Entering Main Loop
 	while (!glfwWindowShouldClose(window))
 	{
@@ -456,11 +625,12 @@ int main(int argc, char*argv[])
 		// ...
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-
+		
+		
 		
 		
 
-		glBindVertexArray(vbo_cube);
+		
 		
 		// Frame time calculation
 		float dt = glfwGetTime() - lastFrameTime;
@@ -473,7 +643,7 @@ int main(int argc, char*argv[])
 
 		
 		
-
+		glBindVertexArray(vbo_cube);
 		// Pressing the spacebar should re-position the Olaf at a random location on the grid. 
 		if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
 		{
@@ -645,9 +815,18 @@ int main(int argc, char*argv[])
 		
 
 		
+		//light
+		// be sure to activate shader when setting uniforms/drawing objects
+		lightingShader.use();
+		lightingShader.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
+		lightingShader.setVec3("lightColor", 1.0f, 1.0f, 1.0f);
 
-		
-	
+		glBindVertexArray(vao_light);
+		mat4 lightPos = mat4(1.0f) *  glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f));
+		lightPos= glm::scale(lightPos, glm::vec3(0.2f));
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &lightPos[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
+		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
 
 		//grid
 		glBindVertexArray(vbo_grid);
