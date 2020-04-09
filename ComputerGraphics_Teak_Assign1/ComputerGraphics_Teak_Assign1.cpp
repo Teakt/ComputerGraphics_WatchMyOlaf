@@ -80,12 +80,12 @@ const char* getFragmentShaderSource()
 		//"uniform vec3 objectColor;"
 		"void main()"
 		"{"
-			//"   FragColor = vec4(objectColor.r, objectColor.g, objectColor.b, 1.0f);"
+			
 			"float ambientStrength = 0.1;"
 			"vec3 ambient = ambientStrength * lightColor;"
-		"FragColor = vec4(lightColor * objectColor, 1.0);"
-
-		
+		//"FragColor = vec4(lightColor * objectColor, 1.0);"
+		//" FragColor = vec4(lightColor.r * objectColor.r, lightColor.g * objectColor.g, lightColor.b * objectColor.b, 1.0f);"
+		" FragColor = vec4(objectColor.r,  objectColor.g,  objectColor.b, 1.0f);"
 		"}";
 }
 
@@ -549,7 +549,7 @@ int main(int argc, char*argv[])
 	mat4 projectionMatrix = glm::perspective(70.0f,            // field of view in degrees
 		1024.0f / 768.0f,  // aspect ratio
 		0.01f, 100.0f);   // near and far (near > 0)
-
+	
 	GLuint projectionMatrixLocation = glGetUniformLocation(shaderProgram, "projectionMatrix");
 	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, &projectionMatrix[0][0]);
 
@@ -710,7 +710,7 @@ int main(int argc, char*argv[])
 		
 		
 		GLuint worldMatrixLocation = glGetUniformLocation(shaderProgram, "worldMatrix");
-
+		
 
 		// drawing the feet left
 		glm::mat4 scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.2f, -0.2f, 0.175f));
@@ -907,19 +907,57 @@ int main(int argc, char*argv[])
 			glfwSetWindowShouldClose(window, true);
 
 
+		// World Transform
+	
 
-
-
-		// Projection Transform
-		if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
+		if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) // move world Wx
 		{
-			glm::mat4 projectionMatrix = glm::perspective(glm::radians(45.0f),  // field of view in degrees
-				800.0f / 600.0f,      // aspect ratio
-				0.01f, 100.0f);       // near and far (near > 0)
+			projectionMatrix = projectionMatrix * glm::rotate(mat4(1.0f), glm::radians(0.1f), glm::vec3(0.001f, 0.0f, 0.0f));
 
 			GLuint projectionMatrixLocation = glGetUniformLocation(shaderProgram, "projectionMatrix");
 			glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, &projectionMatrix[0][0]);
 		}
+
+		if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) // move world W-x
+		{
+			projectionMatrix = projectionMatrix * glm::rotate(mat4(1.0f), glm::radians(0.1f), glm::vec3(-0.001f, 0.0f, 0.0f));
+
+			GLuint projectionMatrixLocation = glGetUniformLocation(shaderProgram, "projectionMatrix");
+			glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, &projectionMatrix[0][0]);
+		}
+
+		if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) // move world Wy
+		{
+			projectionMatrix = projectionMatrix * glm::rotate(mat4(1.0f), glm::radians(0.1f), glm::vec3(0.0f, 0.001f, 0.0f));
+
+			GLuint projectionMatrixLocation = glGetUniformLocation(shaderProgram, "projectionMatrix");
+			glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, &projectionMatrix[0][0]);
+		}
+
+		if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) // move world W-y
+		{
+			projectionMatrix = projectionMatrix * glm::rotate(mat4(1.0f), glm::radians(0.1f), glm::vec3(0.0f, -0.001f, 0.0f));
+
+			GLuint projectionMatrixLocation = glGetUniformLocation(shaderProgram, "projectionMatrix");
+			glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, &projectionMatrix[0][0]);
+		}
+
+		if (glfwGetKey(window, GLFW_KEY_5 == GLFW_PRESS)) // reset cam
+		{
+			
+		}
+		
+		// Projection Transform
+		if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
+		{
+			projectionMatrix = glm::perspective(70.0f,            // field of view in degrees
+				1024.0f / 768.0f,  // aspect ratio
+				0.01f, 100.0f);   // near and far (near > 0)
+
+			GLuint projectionMatrixLocation = glGetUniformLocation(shaderProgram, "projectionMatrix");
+			glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, &projectionMatrix[0][0]);
+		}
+		
 
 		if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS)
 		{
@@ -934,6 +972,7 @@ int main(int argc, char*argv[])
 		bool fastCam = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
 		float currentCameraSpeed = (fastCam) ? cameraFastSpeed : cameraSpeed;
 
+		/*
 		// View Transform
 
 		if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) // move camera to the left
@@ -955,6 +994,8 @@ int main(int argc, char*argv[])
 		{
 			cameraPosition.y += currentCameraSpeed * dt;
 		}
+
+		*/
 
 		if (glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS) // move camera backward
 		{
