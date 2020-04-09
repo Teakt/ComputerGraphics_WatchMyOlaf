@@ -95,7 +95,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ThirdParty\glm;C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ThirdParty\glfw-3.3\include;C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ThirdParty\glew-2.1.0\include;C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ThirdParty\FreeImage-3170\Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ComputerGraphics_Teak_Assign1;C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ThirdParty\glm;C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ThirdParty\glfw-3.3\include;C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ThirdParty\glew-2.1.0\include;C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ThirdParty\FreeImage-3170\Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -162,9 +162,17 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <DeploymentContent>false</DeploymentContent>
     </ClCompile>
+    <ClCompile Include="Sphere.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\..\..\..\..\..\Pictures\grid_image.jpg" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="OBJloader.h" />
+    <ClInclude Include="OBJloaderV2.h" />
+    <ClInclude Include="shader.h" />
+    <ClInclude Include="shaderloader.h" />
+    <ClInclude Include="Sphere.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
