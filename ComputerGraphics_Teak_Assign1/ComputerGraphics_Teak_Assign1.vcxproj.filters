@@ -43,5 +43,8 @@
     <ClInclude Include="OBJloader.h">
       <Filter>Fichiers sources</Filter>
     </ClInclude>
+    <ClInclude Include="stb_image.h">
+      <Filter>Fichiers sources</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

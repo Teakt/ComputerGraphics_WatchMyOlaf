@@ -10,6 +10,11 @@
 #include <sstream>
 #include <iomanip>
 #include <fstream>
+#include <stdlib.h>
+#include <time.h>
+#include <stdio.h>
+
+
 
 #define GLEW_STATIC 1   // This allows linking with Static Library on Windows, without DLL
 #include <GL/glew.h>    // Include GLEW - OpenGL Extension Wrangler
@@ -27,11 +32,52 @@
 
 #include <shader.h>
 
+#include <string.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+#include <shaderloader.h>
 
 
 using namespace glm;
 using namespace std;
+
+int cubeVertices;
+GLuint cubeVAO;
+int sphereVertices;
+GLuint sphereVAO;
+int cylinderVertices;
+GLuint cylinderVAO;
+	
+
+
+string cylinderPath = "../Assets/Models/cylinder.obj";
+string cubePath = "../Assets/Models/cube.obj";
+string spherePath = "../Assets/Models/sphere.obj";
+// shader variable setters
+void SetUniformMat4(GLuint shader_id, const char* uniform_name, mat4 uniform_value)
+{
+	glUseProgram(shader_id);
+	glUniformMatrix4fv(glGetUniformLocation(shader_id, uniform_name), 1, GL_FALSE, &uniform_value[0][0]);
+}
+
+void SetUniformVec3(GLuint shader_id, const char* uniform_name, vec3 uniform_value)
+{
+	glUseProgram(shader_id);
+	glUniform3fv(glGetUniformLocation(shader_id, uniform_name), 1, value_ptr(uniform_value));
+}
+
+template <class T>
+void SetUniform1Value(GLuint shader_id, const char* uniform_name, T uniform_value)
+{
+	glUseProgram(shader_id);
+	glUniform1i(glGetUniformLocation(shader_id, uniform_name), uniform_value);
+	glUseProgram(0);
+}
+
+
+
+
 
 
 const char* getVertexShaderSource()
@@ -39,28 +85,28 @@ const char* getVertexShaderSource()
 	// For now, you use a string for your shader code, in the assignment, shaders will be stored in .glsl files
 	return
 		"#version 330 core\n"
-		"layout (location = 0) in vec3 aPos;"
-		"layout (location = 1) in vec3 aColor;"
-		"layout (location = 2) in vec3 aNormal;"
+		"layout (location = 0) in vec3 position;"
+		"layout (location = 1) in vec3 normals;"
+		"layout(location = 2) in vec2 aUV;"
 		""
-		"out vec3 FragPos;"
-		"out vec3 Normal;"
-		"out vec3 LightPos;"
-		""
-		"uniform vec3 lightPos;"
 		"uniform mat4 worldMatrix;"
 		"uniform mat4 viewMatrix = mat4(1.0);"  // default value for view matrix (identity)
 		"uniform mat4 projectionMatrix = mat4(1.0);"
+		"uniform mat4 light_view_proj_matrix;"
 		""
-		"out vec3 vertexColor;"
+		"out vec3 fragment_normal;"
+		"out vec3 fragment_position;"
+		"out vec4 fragment_position_light_space;"
+		"out vec2 vertexUV;"
+		""
 		"void main()"
 		"{"
-		""
+		"fragment_normal = mat3(model_matrix) * normals;"
+		"fragment_position = vec3(model_matrix * vec4(position, 1.0));"
+		"fragment_position_light_space = light_view_proj_matrix * vec4(fragment_position, 1.0);"
 		"   mat4 modelViewProjection = projectionMatrix * viewMatrix * worldMatrix;"
-		"   gl_Position = modelViewProjection * vec4(aPos.x, aPos.y, aPos.z, 1.0);"
-		" FragPos = vec3(viewMatrix * worldMatrix * vec4(aPos, 1.0));"
-		"Normal = mat3(transpose(inverse(viewMatrix * worldMatrix))) * aNormal;"
-		"LightPos = vec3(viewMatrix * vec4(lightPos, 1.0));"
+		"   gl_Position = modelViewProjection * vec4(position, 1.0);"
+		"vertexUV = aUV;"
 		"}";
 }
 
@@ -72,19 +118,11 @@ const char* getFragmentShaderSource()
 		"uniform vec3 objectColor;"
 		"in vec3 vertexColor;"
 		"out vec4 FragColor;"
-		"in vec3 FragPos;"
-		"in vec3 Normal;"
-		"in vec3 LightPos;"   // extra in variable, since we need the light position in view space we calculate this in the vertex shader
 		""
 		"uniform vec3 lightColor;"
-		//"uniform vec3 objectColor;"
+
 		"void main()"
 		"{"
-			
-			"float ambientStrength = 0.1;"
-			"vec3 ambient = ambientStrength * lightColor;"
-		//"FragColor = vec4(lightColor * objectColor, 1.0);"
-		//" FragColor = vec4(lightColor.r * objectColor.r, lightColor.g * objectColor.g, lightColor.b * objectColor.b, 1.0f);"
 		" FragColor = vec4(objectColor.r,  objectColor.g,  objectColor.b, 1.0f);"
 		"}";
 }
@@ -476,6 +514,8 @@ int createVertexBufferObjectAxis() // for the grid
 }
 
 
+GLuint loadTexture(const char *filename);
+
 int main(int argc, char*argv[])
 {
 	// Initialize GLFW and OpenGL version
@@ -518,17 +558,59 @@ int main(int argc, char*argv[])
 	
 
 	// Compile and link shaders here ...
-	int shaderProgram = compileAndLinkShaders();
-	// build and compile our shader zprogram
-   // ------------------------------------
-	Shader lightingShader("1.colors.vs", "1.colors.fs");
-	Shader lampShader("1.lamp.vs", "1.lamp.fs");
+	//int shaderProgram = compileAndLinkShaders();
 
+  
 	// We can set the shader once, since we have only one
-	glUseProgram(shaderProgram);
+	//glUseProgram(shaderProgram);
 
 	//ahhh
+	
+	GLuint grassTextureID = loadTexture("../Assets/Textures/grass.jpg");
+#if defined(PLATFORM_OSX)
+	std::string shaderPathPrefix = "Shaders/";
+#else
+	std::string shaderPathPrefix = "../Assets/Shaders/";
+#endif
 
+	GLuint shaderProgram = loadSHADER(shaderPathPrefix + "scene_vertex.glsl", shaderPathPrefix + "scene_fragment.glsl");
+	GLuint shaderShadow = loadSHADER(shaderPathPrefix + "shadow_vertex.glsl", shaderPathPrefix + "shadow_fragment.glsl");
+
+	glUseProgram(shaderProgram);
+	/*
+	// Setup texture and framebuffer for creating shadow map
+	// Dimensions of the shadow texture, which should cover the viewport window size and shouldn't be oversized and waste resources
+	const unsigned int DEPTH_MAP_TEXTURE_SIZE = 1024;
+
+	// Variable storing index to texture used for shadow mapping
+	GLuint depth_map_texture;
+	// Get the texture
+	glGenTextures(1, &depth_map_texture);
+	// Bind the texture so the next glTex calls affect it
+	glBindTexture(GL_TEXTURE_2D, depth_map_texture);
+	// Create the texture and specify it's attributes, including widthn height, components (only depth is stored, no color information)
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, DEPTH_MAP_TEXTURE_SIZE, DEPTH_MAP_TEXTURE_SIZE, 0, GL_DEPTH_COMPONENT, GL_FLOAT,
+		NULL);
+	// Set texture sampler parameters.
+	// The two calls below tell the texture sampler inside the shader how to upsample and downsample the texture. Here we choose the nearest filtering option, which means we just use the value of the closest pixel to the chosen image coordinate.
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	// The two calls below tell the texture sampler inside the shader how it should deal with texture coordinates outside of the [0, 1] range. Here we decide to just tile the image.
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+
+	// Variable storing index to framebuffer used for shadow mapping
+	GLuint depth_map_fbo;  // fbo: framebuffer object
+						   // Get the framebuffer
+	glGenFramebuffers(1, &depth_map_fbo);
+	// Bind the framebuffer so the next glFramebuffer calls affect it
+	glBindFramebuffer(GL_FRAMEBUFFER, depth_map_fbo);
+	// Attach the depth map texture to the depth map framebuffer
+	//glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, depth_map_texture, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_map_texture, 0);
+	glDrawBuffer(GL_NONE); //disable rendering colors, only write depth values
+	*/
 
 	// Camera parameters for view transform
 	vec3 cameraPosition(0.6f, 1.0f, 10.0f);
@@ -542,6 +624,11 @@ int main(int argc, char*argv[])
 	float cameraVerticalAngle = 0.0f;
 	bool  cameraFirstPerson = true; // press 1 or 2 to toggle this variable
 
+
+	
+
+	
+
 	// Spinning cube at camera position
 	float spinningCubeAngle = 0.0f;
 
@@ -550,25 +637,39 @@ int main(int argc, char*argv[])
 		1024.0f / 768.0f,  // aspect ratio
 		0.01f, 100.0f);   // near and far (near > 0)
 	
-	GLuint projectionMatrixLocation = glGetUniformLocation(shaderProgram, "projectionMatrix");
-	glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, &projectionMatrix[0][0]);
+	//GLuint projectionMatrixLocation = glGetUniformLocation(shaderProgram, "projectionMatrix");
+	//glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, &projectionMatrix[0][0]);
+
+	
 
 	// Set initial view matrix
 	mat4 viewMatrix = lookAt(cameraPosition,  // eye
 		cameraPosition + cameraLookAt,  // center
 		cameraUp); // up
 
-	GLuint viewMatrixLocation = glGetUniformLocation(shaderProgram, "viewMatrix");
-	glUniformMatrix4fv(viewMatrixLocation, 1, GL_FALSE, &viewMatrix[0][0]);
+	//GLuint viewMatrixLocation = glGetUniformLocation(shaderProgram, "viewMatrix");
+	//glUniformMatrix4fv(viewMatrixLocation, 1, GL_FALSE, &viewMatrix[0][0]);
 
+	
+	// Set projection matrix on both shaders
+	SetUniformMat4(shaderProgram, "projectionMatrix", projectionMatrix);
 
+	// Set view matrix on both shaders
+	SetUniformMat4(shaderProgram, "viewMatrix", viewMatrix);
+
+	// Set light color on scene shader
+	SetUniformVec3(shaderProgram, "light_color", vec3(1.0, 1.0, 1.0));
+
+	// Set object color on scene shader
+	SetUniformVec3(shaderProgram, "objectColor", vec3(0.0, 1.0, 0.0));
+	
 
 	// Define and upload geometry to the GPU here ...
 	int vbo_cube = createVertexBufferObject();
 	int vbo_grid = createVertexBufferObjectGrid();
 	int vbo_axis = createVertexBufferObjectAxis();
-	int vbo_sphere = createVertexBufferObject_Sphere();
-	int vao_light = lightVAO();
+	//int vbo_sphere = createVertexBufferObject_Sphere();
+	//int vao_light = lightVAO();
 
 	// For frame time
 	float lastFrameTime = glfwGetTime();
@@ -591,7 +692,7 @@ int main(int argc, char*argv[])
 	glEnable(GL_DEPTH_TEST); 
 
 
-
+	
 	
 
 	GLuint colorLocation = glGetUniformLocation(shaderProgram, "objectColor");
@@ -609,7 +710,7 @@ int main(int argc, char*argv[])
 	// here, we're making all the triangles spin around the y axis (which in terms of the camera space is the "up" axis).
 	//glm::mat4 bodyMatrix = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
 	glm::mat4 bodyMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-
+	glm::mat4 centerMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
 
 	srand(static_cast <unsigned> (time(0)));
 
@@ -637,13 +738,55 @@ int main(int argc, char*argv[])
 		lastFrameTime += dt;
 
 		
+		/*************************** LIGHTING ********************************/
+		
+		// light parameters
+		vec3 lightPosition = vec3(0.0f, 4.0f, 0.0f); // the location of the light in 3D space
+		vec3 lightFocus(0.0f, 0.0f, 1.0f);      // the point in 3D space the light "looks" at
+		vec3 lightDirection = normalize(lightFocus - lightPosition);
+
+		float lightNearPlane = 20.0f;
+		float lightFarPlane = 180.0f;
+
+		mat4 lightProjectionMatrix = perspective(70.0f, (float)1024 / (float)768, lightNearPlane, lightFarPlane);
+		mat4 lightViewMatrix = lookAt(lightPosition, lightFocus, vec3(0.0f, 1.0f, 0.0f));
+		mat4 lightSpaceMatrix = lightProjectionMatrix * lightViewMatrix;
+
+		// Set light space matrix on both shaders
+		SetUniformMat4(shaderShadow, "light_view_proj_matrix", lightSpaceMatrix);
+		SetUniformMat4(shaderProgram, "light_view_proj_matrix", lightSpaceMatrix);
+		// Set light position on scene shader
+		SetUniformVec3(shaderProgram, "light_position", lightPosition);
+		// Set light direction on scene shader
+		SetUniformVec3(shaderProgram, "light_direction", lightDirection);
+
+		
+
+
+		
 
 		angle = (angle + rotationSpeed * dt); // angles in degrees, but glm expects radians (conversion below)
+
+
+	
 
 
 		
 		
 		glBindVertexArray(vbo_cube);
+
+	
+		mat4 worldMatrixcube = mat4(1.0f);
+		worldMatrixcube = glm::translate(worldMatrixcube, lightPosition);
+		worldMatrixcube = glm::scale(worldMatrixcube, glm::vec3(0.2f));
+		SetUniformVec3(shaderProgram, "objectColor", vec3(1.0, 1.0, 1.0));
+		SetUniformMat4(shaderProgram, "worldMatrix", worldMatrixcube);
+
+		glDrawArrays(GL_TRIANGLES, 0, 36);
+
+
+		glBindVertexArray(vbo_cube);
+
 		// Pressing the spacebar should re-position the Olaf at a random location on the grid. 
 		if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
 		{
@@ -815,18 +958,7 @@ int main(int argc, char*argv[])
 		
 
 		
-		//light
-		// be sure to activate shader when setting uniforms/drawing objects
-		lightingShader.use();
-		lightingShader.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
-		lightingShader.setVec3("lightColor", 1.0f, 1.0f, 1.0f);
-
-		glBindVertexArray(vao_light);
-		mat4 lightPos = mat4(1.0f) *  glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f));
-		lightPos= glm::scale(lightPos, glm::vec3(0.2f));
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &lightPos[0][0]);
-		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
-		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
+		
 
 		//grid
 		glBindVertexArray(vbo_grid);
@@ -873,15 +1005,17 @@ int main(int argc, char*argv[])
 		// axis 
 
 		glBindVertexArray(vbo_axis);
-		glLineWidth(3.0f);
+		glLineWidth(5.0f);
 		mat4 axis_mat = mat4(1.0f) ;
 		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &axis_mat[0][0]);
 		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 0.5, 1.0)));
 		glDrawArrays(GL_LINES, 0, 2);
 
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &axis_mat[0][0]);
 		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 1.0)));
 		glDrawArrays(GL_LINES, 2, 4);
 
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &axis_mat[0][0]);
 		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 0.0, 1.0)));
 		glDrawArrays(GL_LINES, 4, 6);
 
@@ -936,15 +1070,27 @@ int main(int argc, char*argv[])
 
 		if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) // move world W-y
 		{
+			
 			projectionMatrix = projectionMatrix * glm::rotate(mat4(1.0f), glm::radians(0.1f), glm::vec3(0.0f, -0.001f, 0.0f));
 
 			GLuint projectionMatrixLocation = glGetUniformLocation(shaderProgram, "projectionMatrix");
 			glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, &projectionMatrix[0][0]);
 		}
 
-		if (glfwGetKey(window, GLFW_KEY_5 == GLFW_PRESS)) // reset cam
+		if (glfwGetKey(window, GLFW_KEY_V== GLFW_PRESS)) // reset cam
 		{
-			
+			projectionMatrix = glm::scale(projectionMatrix, glm::vec3(1.0f, 1.0f, 1.01f));;
+
+			GLuint projectionMatrixLocation = glGetUniformLocation(shaderProgram, "projectionMatrix");
+			glUniformMatrix4fv(projectionMatrixLocation, 1, GL_FALSE, &projectionMatrix[0][0]);
+		}
+
+		if (glfwGetKey(window, GLFW_KEY_B == GLFW_PRESS)) // reset cam
+		{
+			viewMatrix = viewMatrix * glm::translate(mat4(1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
+			GLuint viewMatrixLocation = glGetUniformLocation(shaderProgram, "viewMatrix");
+			glUniformMatrix4fv(viewMatrixLocation, 1, GL_FALSE, &viewMatrix[0][0]);
 		}
 		
 		// Projection Transform
@@ -1034,4 +1180,47 @@ int main(int argc, char*argv[])
 	glfwTerminate();
 
 	return 0;
+}
+
+
+GLuint loadTexture(const char *filename)
+{
+	// Step1 Create and bind textures
+	GLuint textureId = 0;
+	glGenTextures(1, &textureId);
+	assert(textureId != 0);
+
+
+	glBindTexture(GL_TEXTURE_2D, textureId);
+
+	// Step2 Set filter parameters
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	// Step3 Load Textures with dimension data
+	int width, height, nrChannels;
+	unsigned char *data = stbi_load(filename, &width, &height, &nrChannels, 0);
+	if (!data)
+	{
+		std::cerr << "Error::Texture could not load texture file:" << filename << std::endl;
+		return 0;
+	}
+
+	// Step4 Upload the texture to the PU
+	GLenum format = 0;
+	if (nrChannels == 1)
+		format = GL_RED;
+	else if (nrChannels == 3)
+		format = GL_RGB;
+	else if (nrChannels == 4)
+		format = GL_RGBA;
+	glTexImage2D(GL_TEXTURE_2D, 0, format, width, height,
+		0, format, GL_UNSIGNED_BYTE, data);
+
+	// Step5 Free resources
+	stbi_image_free(data);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	return textureId;
 }

@@ -173,6 +173,7 @@
     <ClInclude Include="shader.h" />
     <ClInclude Include="shaderloader.h" />
     <ClInclude Include="Sphere.h" />
+    <ClInclude Include="stb_image.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
