@@ -92,10 +92,10 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ComputerGraphics_Teak_Assign1;C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ThirdParty\glm;C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ThirdParty\glfw-3.3\include;C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ThirdParty\glew-2.1.0\include;C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ThirdParty\FreeImage-3170\Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\Assets;C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ComputerGraphics_Teak_Assign1;C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ThirdParty\glm;C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ThirdParty\glfw-3.3\include;C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ThirdParty\glew-2.1.0\include;C:\Users\teakg\Desktop\4A_CANADA2020\ComputerGraphics\Projects\ComputerGraphics_Teak_Assign1\ThirdParty\FreeImage-3170\Source;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -169,10 +169,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="OBJloader.h" />
-    <ClInclude Include="OBJloaderV2.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="shaderloader.h" />
     <ClInclude Include="Sphere.h" />
+    <ClInclude Include="stb_image.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="ComputerGraphics_Teak_Assign1.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

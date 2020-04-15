@@ -1,15 +1,21 @@
 #version 330 core
 
+
+
+		
+
+
+
 const float PI = 3.1415926535897932384626433832795;
 
 uniform vec3 light_color;
 uniform vec3 light_position;
 uniform vec3 light_direction;
 
-uniform vec3 object_color;
+uniform vec3 objectColor;
 
-const float shading_ambient_strength    = 0.1;
-const float shading_diffuse_strength    = 0.6;
+const float shading_ambient_strength    = 0.3;
+const float shading_diffuse_strength    = 0.9;
 const float shading_specular_strength   = 0.3;
 
 uniform float light_cutoff_outer;
@@ -83,7 +89,7 @@ void main()
     diffuse = scalar * diffuse_color(light_color, light_position);
     specular = scalar * specular_color(light_color, light_position);
     
-    vec3 color = (specular + diffuse + ambient) * object_color;
+    vec3 color = (specular + diffuse + ambient) * objectColor ;
     
     result = vec4(color, 1.0f);
 }

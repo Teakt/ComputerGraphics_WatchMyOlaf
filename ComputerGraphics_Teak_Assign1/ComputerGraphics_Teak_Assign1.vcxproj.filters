@@ -34,14 +34,22 @@
     <ClInclude Include="shader.h">
       <Filter>Fichiers sources</Filter>
     </ClInclude>
-    <ClInclude Include="OBJloaderV2.h">
-      <Filter>Fichiers sources</Filter>
-    </ClInclude>
     <ClInclude Include="shaderloader.h">
       <Filter>Fichiers sources</Filter>
     </ClInclude>
     <ClInclude Include="OBJloader.h">
       <Filter>Fichiers sources</Filter>
     </ClInclude>
+    <ClInclude Include="stb_image.h">
+      <Filter>Fichiers sources</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Fichiers d%27en-tête</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="ComputerGraphics_Teak_Assign1.rc">
+      <Filter>Fichiers de ressources</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>
