@@ -39,21 +39,13 @@
 #include <shaderloader.h>
 
 
+
 using namespace glm;
 using namespace std;
 
-int cubeVertices;
-GLuint cubeVAO;
-int sphereVertices;
-GLuint sphereVAO;
-int cylinderVertices;
-GLuint cylinderVAO;
-	
 
 
-string cylinderPath = "../Assets/Models/cylinder.obj";
-string cubePath = "../Assets/Models/cube.obj";
-string spherePath = "../Assets/Models/sphere.obj";
+
 // shader variable setters
 void SetUniformMat4(GLuint shader_id, const char* uniform_name, mat4 uniform_value)
 {
@@ -100,10 +92,7 @@ const char* getVertexShaderSource()
 		"out vec2 vertexUV;"
 		""
 		"void main()"
-		"{"
-		"fragment_normal = mat3(model_matrix) * normals;"
-		"fragment_position = vec3(model_matrix * vec4(position, 1.0));"
-		"fragment_position_light_space = light_view_proj_matrix * vec4(fragment_position, 1.0);"
+	
 		"   mat4 modelViewProjection = projectionMatrix * viewMatrix * worldMatrix;"
 		"   gl_Position = modelViewProjection * vec4(position, 1.0);"
 		"vertexUV = aUV;"
@@ -181,6 +170,197 @@ int compileAndLinkShaders()
 	glDeleteShader(fragmentShader);
 
 	return shaderProgram;
+}
+
+bool loadOBJ2(
+	const char * path,
+	std::vector<int> & vertexIndices,
+	std::vector<glm::vec3> & temp_vertices,
+	std::vector<glm::vec3> & out_normals,
+	std::vector<glm::vec2> & out_uvs) {
+
+	std::vector<int> uvIndices, normalIndices;
+	std::vector<glm::vec2> temp_uvs;
+	std::vector<glm::vec3> temp_normals;
+
+	FILE * file;
+	file = fopen(path, "r");
+	if (!file) {
+		printf("Impossible to open the file ! Are you in the right path ground ?\n");
+		printf(path);
+		getchar();
+		return false;
+	}
+
+	while (1) {
+
+		char lineHeader[128];
+		// read the first word of the line
+		int res = fscanf(file, "%s", lineHeader);
+		if (res == EOF)
+			break; // EOF = End Of File. Quit the loop.
+
+				   // else : parse lineHeader
+
+		if (strcmp(lineHeader, "v") == 0) {
+			glm::vec3 vertex;
+			res = fscanf(file, "%f %f %f\n", &vertex.x, &vertex.y, &vertex.z);
+
+			temp_vertices.push_back(vertex);
+		}
+		else if (strcmp(lineHeader, "vt") == 0) {
+			glm::vec2 uv;
+			res = fscanf(file, "%f %f\n", &uv.x, &uv.y);
+			if (res != 2) {
+				printf("Missing uv information!\n");
+			}
+			uv.y = -uv.y; // Invert V coordinate since we will only use DDS texture, which are inverted. Remove if you want to use TGA or BMP loaders.
+			temp_uvs.push_back(uv);
+		}
+		else if (strcmp(lineHeader, "vn") == 0) {
+			glm::vec3 normal;
+			res = fscanf(file, "%f %f %f\n", &normal.x, &normal.y, &normal.z);
+			if (res != 3) {
+				printf("Missing normal information!\n");
+			}
+			temp_normals.push_back(normal);
+		}
+		else if (strcmp(lineHeader, "f") == 0) {
+			char* getRes;
+			int vertexIndex[3], uvIndex[3], normalIndex[3];
+			bool uv = true;
+			bool norm = true;
+			char line[128];
+			getRes = fgets(line, 128, file);
+			if (getRes == 0) {
+				printf("incomplete face\n");
+			}
+
+			//vertex, uv, norm
+			int matches = sscanf(line, "%d/%d/%d %d/%d/%d %d/%d/%d\n", &vertexIndex[0], &uvIndex[0], &normalIndex[0], &vertexIndex[1], &uvIndex[1], &normalIndex[1], &vertexIndex[2], &uvIndex[2], &normalIndex[2]);
+			if (matches != 9) {
+				//vertex, norm
+				matches = sscanf(line, "%d//%d %d//%d %d//%d\n", &vertexIndex[0], &normalIndex[0], &vertexIndex[1], &normalIndex[1], &vertexIndex[2], &normalIndex[2]);
+				if (matches != 6) {
+					//vertex, uv
+					matches = sscanf(line, "%d/%d %d/%d %d/%d\n", &vertexIndex[0], &uvIndex[0], &vertexIndex[1], &uvIndex[1], &vertexIndex[2], &uvIndex[2]);
+					if (matches != 6) {
+						//vertex
+						matches = sscanf(line, "%d %d %d\n", &vertexIndex[0], &vertexIndex[1], &vertexIndex[2]);
+						if (matches != 3) {
+							printf("File can't be read by our simple parser. 'f' format expected: d/d/d d/d/d d/d/d || d/d d/d d/d || d//d d//d d//d\n");
+							printf("Character at %ld", ftell(file));
+							return false;
+						}
+						uv, norm = false;
+					}
+					else {
+						norm = false;
+					}
+				}
+				else {
+					uv = false;
+				}
+			}
+			vertexIndices.push_back(abs(vertexIndex[0]) - 1);
+			vertexIndices.push_back(abs(vertexIndex[1]) - 1);
+			vertexIndices.push_back(abs(vertexIndex[2]) - 1);
+			if (norm) {
+				normalIndices.push_back(abs(normalIndex[0]) - 1);
+				normalIndices.push_back(abs(normalIndex[1]) - 1);
+				normalIndices.push_back(abs(normalIndex[2]) - 1);
+			}
+			if (uv) {
+				uvIndices.push_back(abs(uvIndex[0]) - 1);
+				uvIndices.push_back(abs(uvIndex[1]) - 1);
+				uvIndices.push_back(abs(uvIndex[2]) - 1);
+			}
+		}
+		else {
+			char clear[1000];
+			char* getsRes = fgets(clear, 1000, file);
+		}
+	}
+	if (normalIndices.size() != 0)
+		out_normals.resize(temp_normals.size());
+	if (uvIndices.size() != 0)
+		out_uvs.resize(temp_normals.size());
+	for (unsigned int i = 0; i < vertexIndices.size(); i++) {
+		int vi = vertexIndices[i];
+		if (normalIndices.size() != 0) {
+			int ni = normalIndices[i];
+			out_normals[vi] = temp_normals[ni];
+		}
+		if (uvIndices.size() != 0 && i < uvIndices.size()) {
+			int ui = uvIndices[i];
+			out_uvs[vi] = temp_uvs[ui];
+		}
+	}
+
+	return true;
+}
+
+
+GLuint setupModelEBO(string path, int& vertexCount)
+{
+	vector<int> vertexIndices;
+	//The contiguous sets of three indices of vertices, normals and UVs, used to make a triangle
+	vector<glm::vec3> vertices;
+	vector<glm::vec3> normals;
+	vector<glm::vec2> UVs;
+
+	//read the vertices from the cube.obj file
+	//We won't be needing the normals or UVs for this program
+	loadOBJ2(path.c_str(), vertexIndices, vertices, normals, UVs);
+
+	GLuint VAO;
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO); //Becomes active VAO
+							// Bind the Vertex Array Object first, then bind and set vertex buffer(s) and attribute pointer(s).
+
+							//Vertex VBO setup
+	GLuint vertices_VBO;
+	glGenBuffers(1, &vertices_VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, vertices_VBO);
+	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices.front(), GL_STATIC_DRAW);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(0);
+
+	//Normals VBO setup
+	GLuint normals_VBO;
+	glGenBuffers(1, &normals_VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, normals_VBO);
+	glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals.front(), GL_STATIC_DRAW);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(1);
+
+	//UVs VBO setup
+	GLuint uvs_VBO;
+	glGenBuffers(1, &uvs_VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, uvs_VBO);
+	glBufferData(GL_ARRAY_BUFFER, UVs.size() * sizeof(glm::vec2), &UVs.front(), GL_STATIC_DRAW);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), (GLvoid*)0);
+	glEnableVertexAttribArray(2);
+
+	//EBO setup
+	GLuint EBO;
+	glGenBuffers(1, &EBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, vertexIndices.size() * sizeof(int), &vertexIndices.front(), GL_STATIC_DRAW);
+
+	unsigned int lightVAO;
+	glGenVertexArrays(1, &lightVAO);
+	glBindVertexArray(lightVAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vertices_VBO);
+	// note that we update the lamp's position attribute's stride to reflect the updated buffer data
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	glBindVertexArray(0);
+	// Unbind VAO (it's always a good thing to unbind any buffer/array to prevent strange bugs), remember: do NOT unbind the EBO, keep it bound to this VAO
+	vertexCount = vertexIndices.size();
+	return VAO;
 }
 
 int lightVAO()
@@ -422,7 +602,12 @@ int createVertexBufferObjectGrid() // for the grid
 
 		
 	};
-
+	float vertices[] = {
+		// positions          // colors           // texture coords (note that we changed them to 2.0f!)
+		 5.0f,  0.0f, 0.0f,   0.0f, 1.0f, 0.0f,   0.0f, 1.0f, // top right
+		 -5.0f, 0.0f, 0.0f,   0.0f, 1.0f, 0.0f,   0.0f,1.0f // bottom right
+	
+	};
 
 	// Create a vertex array
 	GLuint vertexArrayObject;
@@ -518,6 +703,20 @@ GLuint loadTexture(const char *filename);
 
 int main(int argc, char*argv[])
 {
+
+	int cubeVertices;
+	GLuint cubeVAO;
+	int sphereVertices;
+	GLuint sphereVAO;
+	int cylinderVertices;
+	GLuint cylinderVAO;
+
+
+
+	string cylinderPath = "../Assets/Models/cylinder.obj";
+	string cubePath = "../Assets/Models/cube.obj";
+	string spherePath = "../Assets/Models/sphere.obj";
+
 	// Initialize GLFW and OpenGL version
 	glfwInit();
 
@@ -554,11 +753,14 @@ int main(int argc, char*argv[])
 	}
 
 	// Black background
-	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+	glClearColor(0.3f, 0.1f, 0.6f, 1.0f);
 	
+	cubeVAO = setupModelEBO(cubePath, cubeVertices);
+	sphereVAO = setupModelEBO(spherePath, sphereVertices);
+	cylinderVAO = setupModelEBO(cylinderPath, cylinderVertices);
 
 	// Compile and link shaders here ...
-	//int shaderProgram = compileAndLinkShaders();
+	//int shaderGrid = compileAndLinkShaders();
 
   
 	// We can set the shader once, since we have only one
@@ -567,6 +769,9 @@ int main(int argc, char*argv[])
 	//ahhh
 	
 	GLuint grassTextureID = loadTexture("../Assets/Textures/grass.jpg");
+	GLuint snowTextureID = loadTexture("../Assets/Textures/snow.jpg");
+	GLuint carrotTextureID = loadTexture("../Assets/Textures/cement.jpg");
+
 #if defined(PLATFORM_OSX)
 	std::string shaderPathPrefix = "Shaders/";
 #else
@@ -575,8 +780,10 @@ int main(int argc, char*argv[])
 
 	GLuint shaderProgram = loadSHADER(shaderPathPrefix + "scene_vertex.glsl", shaderPathPrefix + "scene_fragment.glsl");
 	GLuint shaderShadow = loadSHADER(shaderPathPrefix + "shadow_vertex.glsl", shaderPathPrefix + "shadow_fragment.glsl");
+	GLuint shaderGrid = loadSHADER(shaderPathPrefix + "grid_vertex.glsl", shaderPathPrefix + "grid_fragment.glsl");
 
 	glUseProgram(shaderProgram);
+	
 	/*
 	// Setup texture and framebuffer for creating shadow map
 	// Dimensions of the shadow texture, which should cover the viewport window size and shouldn't be oversized and waste resources
@@ -613,7 +820,7 @@ int main(int argc, char*argv[])
 	*/
 
 	// Camera parameters for view transform
-	vec3 cameraPosition(0.6f, 1.0f, 10.0f);
+	vec3 cameraPosition(0.0f, 1.0f, 12.0f);
 	vec3 cameraLookAt(0.0f, 0.0f, -1.0f);
 	vec3 cameraUp(0.0f, 1.0f, 0.0f);
 
@@ -626,8 +833,8 @@ int main(int argc, char*argv[])
 
 
 	
-
-	
+	vec3 position = vec3(0.0f, 0.0f, 0.0f);
+	float rotation_angle = 0.0f;
 
 	// Spinning cube at camera position
 	float spinningCubeAngle = 0.0f;
@@ -661,7 +868,7 @@ int main(int argc, char*argv[])
 	SetUniformVec3(shaderProgram, "light_color", vec3(1.0, 1.0, 1.0));
 
 	// Set object color on scene shader
-	SetUniformVec3(shaderProgram, "objectColor", vec3(0.0, 1.0, 0.0));
+	SetUniformVec3(shaderProgram, "objectColor", vec3(1.0, 1.0, 1.0));
 	
 
 	// Define and upload geometry to the GPU here ...
@@ -741,15 +948,16 @@ int main(int argc, char*argv[])
 		/*************************** LIGHTING ********************************/
 		
 		// light parameters
-		vec3 lightPosition = vec3(0.0f, 4.0f, 0.0f); // the location of the light in 3D space
-		vec3 lightFocus(0.0f, 0.0f, 1.0f);      // the point in 3D space the light "looks" at
+		vec3 lightPosition = vec3(0.0f, 3.0f, 0.0f); // the location of the light in 3D space
+		vec3 lightFocus(0.0f, -0.1f, 0.0f);      // the point in 3D space the light "looks" at
 		vec3 lightDirection = normalize(lightFocus - lightPosition);
 
-		float lightNearPlane = 20.0f;
-		float lightFarPlane = 180.0f;
+		float lightNearPlane = 3.0f;
+		float lightFarPlane = 2000.0f;
 
-		mat4 lightProjectionMatrix = perspective(70.0f, (float)1024 / (float)768, lightNearPlane, lightFarPlane);
-		mat4 lightViewMatrix = lookAt(lightPosition, lightFocus, vec3(0.0f, 1.0f, 0.0f));
+		mat4 lightProjectionMatrix = perspective(50.0f, (float)1024 / (float)768, lightNearPlane, lightFarPlane);
+		
+		mat4 lightViewMatrix = lookAt(lightPosition, lightFocus, vec3(1.0f, 0.0f,1.0f));
 		mat4 lightSpaceMatrix = lightProjectionMatrix * lightViewMatrix;
 
 		// Set light space matrix on both shaders
@@ -760,8 +968,41 @@ int main(int argc, char*argv[])
 		// Set light direction on scene shader
 		SetUniformVec3(shaderProgram, "light_direction", lightDirection);
 
-		
+		/*
+		// Render shadow in 2 passes: 1- Render depth map, 2- Render scene
+		// 1- Render shadow map:
+		// a- use program for shadows
+		// b- resize window coordinates to fix depth map output size
+		// c- bind depth map framebuffer to output the depth values
+		{
+			// Use proper shader
+			glUseProgram(shaderShadow);
+			// Use proper image output size
+			glViewport(0, 0, 1024, 768);
+			// Bind depth map texture as output framebuffer
+			glBindFramebuffer(GL_FRAMEBUFFER, depth_map_fbo);
+			// Clear depth data on the framebuffer
+			glClear(GL_DEPTH_BUFFER_BIT);
 
+			glBindVertexArray(cubeVAO);
+
+			mat4 partMatrix = translate(mat4(1.0f), vec3(0.0f, 0.0f, 0.0f)) * rotate(mat4(1.0f), 0.0f, vec3(0.0f, 1.0f, 0.0f)) * scale(mat4(1.0f), vec3(0.0f, 0.0f, 0.0f));
+			mat4 groupMatrix = translate(mat4(1.0f), position) * rotate(mat4(1.0f), rotation_angle, vec3(0.0f, 1.0f, 0.0f)) * scale(mat4(1.0f), vec3(1.0f, 1.0f, 1.0f));
+			mat4 worldMatrix = groupMatrix * partMatrix;
+
+			SetUniformVec3(shaderProgram, "objectColor", vec3(0.0, 1.0, 0.0));
+			SetUniformMat4(shaderProgram, "worldMatrix", worldMatrix);
+
+			glDrawElements(GL_TRIANGLES, cubeVertices, GL_UNSIGNED_INT, 0);
+			glBindTexture(GL_TEXTURE_2D, depth_map_texture);
+			//tree.Draw(shaderShadow);
+			//tree.moveLocation(0.0f, 10.0f, 0.0f);
+
+			
+			// Unbind geometry
+			glBindVertexArray(0);
+		}
+		*/
 
 		
 
@@ -772,8 +1013,8 @@ int main(int argc, char*argv[])
 
 
 		
-		
-		glBindVertexArray(vbo_cube);
+		// light source 
+		glBindVertexArray(cubeVAO);
 
 	
 		mat4 worldMatrixcube = mat4(1.0f);
@@ -782,10 +1023,10 @@ int main(int argc, char*argv[])
 		SetUniformVec3(shaderProgram, "objectColor", vec3(1.0, 1.0, 1.0));
 		SetUniformMat4(shaderProgram, "worldMatrix", worldMatrixcube);
 
-		glDrawArrays(GL_TRIANGLES, 0, 36);
+		glDrawElements(GL_TRIANGLES, cubeVertices, GL_UNSIGNED_INT, 0);
+		
 
-
-		glBindVertexArray(vbo_cube);
+		glBindVertexArray(cubeVAO);
 
 		// Pressing the spacebar should re-position the Olaf at a random location on the grid. 
 		if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
@@ -808,12 +1049,302 @@ int main(int argc, char*argv[])
 			bodyMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.00f, 0.99f, 1.00f)) * bodyMatrix;
 		}
 
+	
+
+
+		// finally we actually compute the world matrix using this!
+		// note that matrix composition notation is the reverse of the way we form sentences in english! "apply part matrix then group matrix" means "group matrix * part matrix"
+		glm::mat4 worldMatrix = bodyMatrix * partMatrix;
+
+		// in a full fledged hierarchical modeling implementation, instead of "group" and "part", you would have "parent" and "child" and a tree data structure that relates objects together.
+		// the way the maths extend is pretty simple: we go from "worldMatrix = parentMatrix * childMatrix" to "worldMatrix = ... grandParentMatrix * parentMatrix * childMatrix * grandChildMatrix ..."
+
+		GLenum mode = GL_TRIANGLES;
+		if (glfwGetKey(window, GLFW_KEY_L) == GLFW_PRESS)
+		{
+
+			mode = GL_LINES;
+
+		}
+		if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS)
+		{
+
+			mode = GL_POINTS;
+
+		}
+		
+		
+		GLuint worldMatrixLocation = glGetUniformLocation(shaderProgram, "worldMatrix");
+		
+		glm::mat4 translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(-0.15f, 0.1f, 0.0f));
+		// drawing the feet left
+		glm::mat4 scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.2f, -0.2f, 0.175f));
+		glm::mat4 translationMatrix_lfeet = glm::translate(glm::mat4(1.0f), glm::vec3(-0.15f, 0.1f, 0.0f));
+		
+		partMatrix = translationMatrix_lfeet * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
+
+		glDrawElements(mode, cubeVertices, GL_UNSIGNED_INT, 0);
+		
+
+		// drawing the feet right
+		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.2f, -0.2f, 0.175f));
+		glm::mat4 translationMatrix_rfeet = glm::translate(glm::mat4(1.0f), glm::vec3(0.15f, 0.1f, 0.0f));
+
+		partMatrix = translationMatrix_rfeet * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
+
+		glDrawElements(mode, cubeVertices, GL_UNSIGNED_INT, 0);
+
+
+
+		// drawing the body
+		glBindVertexArray(sphereVAO);
+
+		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.02f, 0.02f, 0.02f));
+		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.6f, 0.0f));
+
+		partMatrix = translationMatrix * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
+
+		glDrawElements(mode, sphereVertices, GL_UNSIGNED_INT, 0);
+
+
+		glBindVertexArray(sphereVAO);
+		// drawing the body upper
+		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.01f, 0.01f, 0.01f));
+		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+		partMatrix = translationMatrix * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
+
+		glDrawElements(mode, sphereVertices, GL_UNSIGNED_INT, 0);
+
+
+		glBindVertexArray(sphereVAO);
+		// drawing the head
+		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.005f, 0.005f, 0.005f));
+		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.4f, 0.0f));
+
+		partMatrix = translationMatrix * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
+
+		glDrawElements(mode, sphereVertices, GL_UNSIGNED_INT, 0);
+
+
+		glBindVertexArray(cubeVAO);
+		// drawing the nose
+		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.05f, 0.05f, 0.5f));
+		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.4f, 0.1f));
+
+		partMatrix = translationMatrix * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 0.0, 1.0)));
+		if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS)
+		{
+
+			glBindTexture(GL_TEXTURE_2D, carrotTextureID);
+			glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 0.64, 0.0)));
+
+		}
+		glDrawElements(mode, cubeVertices, GL_UNSIGNED_INT, 0);
+
+		// drawing the hat
+		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f, -0.25f, 0.1f));
+		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.6f, 0.0f));
+
+		partMatrix = translationMatrix * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 0.0, 0.0)));
+		if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS)
+		{
+
+			glBindTexture(GL_TEXTURE_2D, carrotTextureID);
+			glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.70, 0.71, 0.62)));
+
+		}
+
+		glDrawElements(mode, cubeVertices, GL_UNSIGNED_INT, 0);
+
+		// drawing the left arm
+		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, -0.075f, 0.1f));
+		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(-0.4f, 1.2f, 0.0f));
+
+		partMatrix = translationMatrix * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
+
+		glDrawElements(mode, cubeVertices, GL_UNSIGNED_INT, 0);
+
+		// drawing the right arm
+		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, -0.075f, 0.1f));
+		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.4f, 1.2f, 0.0f));
+
+		partMatrix = translationMatrix * scalingMatrix;
+		worldMatrix = bodyMatrix * partMatrix;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
+
+		glDrawElements(mode, cubeVertices, GL_UNSIGNED_INT, 0);
+
+		
+		//Ground
+		
+		
+		glBindVertexArray(cubeVAO);
+
+
+		mat4 ground = mat4(1.0f);
+
+		
+		ground = glm::translate(ground, vec3(0.0f,-0.02f,0.0f));
+		ground = glm::scale(ground, glm::vec3(25.0f,0.02f,25.0f));
+		
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 0.0)));
+		if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS)
+		{
+
+			glBindTexture(GL_TEXTURE_2D, snowTextureID);
+			glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
+
+		}
+		
+		
+		
+		
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &ground[0][0]);
+		
+		glDrawElements(GL_TRIANGLES, cubeVertices, GL_UNSIGNED_INT, 0);
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+
+
+
+		
+		
+		//grid
+		/*
+		glBindVertexArray(cubeVAO);
+
+		mat4 partMatrixg = translate(mat4(1.0f), vec3(0.0f, 0.0f, 0.0f)) * rotate(mat4(1.0f), 0.0f, vec3(0.0f, 1.0f, 0.0f)) * scale(mat4(1.0f), vec3(0.0f, 0.0f, 0.0f));
+		mat4 groupMatrixg = translate(mat4(1.0f), position) * rotate(mat4(1.0f), rotation_angle, vec3(0.0f, 1.0f, 0.0f)) * scale(mat4(1.0f), vec3(0.0f, 0.0f, 0.0f));
+		mat4 gridMatrix = groupMatrixg * partMatrixg;
+
+		glBindTexture(GL_TEXTURE_2D, grassTextureID);
+		SetUniformVec3(shaderProgram, "objectColor", vec3(0.0, 1.0, 0.0));
+		SetUniformMat4(shaderProgram, "worldMatrix", gridMatrix);
+
+		glDrawElements(GL_TRIANGLES, cubeVertices, GL_UNSIGNED_INT, 0);
+		*/
+		
+
+
+		/*
+		glBindVertexArray(cubeVAO);
+
+		glLineWidth(1.0f);
+
+
+
+		
+
+		mat4 gridWorldMatrix = mat4(1.0f);
+		for (int i = 0; i < 50; i++) {
+			gridWorldMatrix = translate(mat4(1.0f), vec3(0.0f , 0.0f, 0.0f + i * 0.1f) );
+			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &gridWorldMatrix[0][0]);
+			glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 0.0)));
+			glDrawElements(GL_TRIANGLES, cubeVertices, GL_UNSIGNED_INT, 0);
+
+			gridWorldMatrix = translate(mat4(1.0f), vec3(0.0f, 0.0f, -0.0f + i * -0.1f));
+			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &gridWorldMatrix[0][0]);
+			glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 0.0)));
+			glDrawElements(GL_TRIANGLES, cubeVertices, GL_UNSIGNED_INT, 0);
+		}
+
+		
+		
+		mat4 rotatemat = rotate(gridWorldMatrix, radians(90.0f), vec3(0.0f, 1.0f, 0.0f));
+		
+		for (int i = 0; i < 50; i++) {
+			
+			gridWorldMatrix = translate(mat4(1.0f), vec3(0.0f + i * 0.1f, 0.0f,5.0f )) * rotatemat;
+			
+			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &gridWorldMatrix[0][0]);
+			glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 0.0)));
+			glDrawArrays(GL_LINES, 0, 2);
+
+			
+			gridWorldMatrix = translate(mat4(1.0f), vec3(-0.0f + i * -0.1f, 0.0f, 5.0f)) * rotatemat;
+
+			
+			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &gridWorldMatrix[0][0]);
+			glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 0.0)));
+			glDrawArrays(GL_LINES, 0, 2);
+		}
+
+		*/
+
+
+		/*
+		// axis 
+
+		glBindVertexArray(vbo_axis);
+		glLineWidth(5.0f);
+		mat4 axis_mat = mat4(1.0f) ;
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &axis_mat[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 0.5, 1.0)));
+		glDrawArrays(GL_LINES, 0, 2);
+
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &axis_mat[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 1.0)));
+		glDrawArrays(GL_LINES, 2, 4);
+
+		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &axis_mat[0][0]);
+		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 0.0, 1.0)));
+		glDrawArrays(GL_LINES, 4, 6);
+
+
+		*/
+		
+
+		
+		
+
+
+
+		// End Frame
+		glfwSwapBuffers(window);
+		
+
+		// Detect inputs
+		glfwPollEvents();
+
+		//Handle inputs
+		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+			glfwSetWindowShouldClose(window, true);
+
+
 		//The user can control the Olaf position and orientation using keyboard input i.e. 
-		//A → move left, D → move right, W → move up, S → move down, a → rotate left 5 degrees about Y axis, d → rotate right 5 degrees about Y axis. You may add other rotations about other axis, if you want. 
+	//A → move left, D → move right, W → move up, S → move down, a → rotate left 5 degrees about Y axis, d → rotate right 5 degrees about Y axis. You may add other rotations about other axis, if you want. 
 		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
 		{
 
-			bodyMatrix =  bodyMatrix * glm::translate(glm::mat4(1.0f), glm::vec3(-0.05f, 0.0f, 0.0f)) ;
+			bodyMatrix = bodyMatrix * glm::translate(glm::mat4(1.0f), glm::vec3(-0.05f, 0.0f, 0.0f));
+			
+			
 		}
 		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 		{
@@ -840,205 +1371,6 @@ int main(int argc, char*argv[])
 
 			bodyMatrix = bodyMatrix * glm::rotate(glm::mat4(1.0f), glm::radians(5.0f), glm::vec3(0.0f, -1.0f, 0.0f));
 		}
-
-
-		// finally we actually compute the world matrix using this!
-		// note that matrix composition notation is the reverse of the way we form sentences in english! "apply part matrix then group matrix" means "group matrix * part matrix"
-		glm::mat4 worldMatrix = bodyMatrix * partMatrix;
-
-		// in a full fledged hierarchical modeling implementation, instead of "group" and "part", you would have "parent" and "child" and a tree data structure that relates objects together.
-		// the way the maths extend is pretty simple: we go from "worldMatrix = parentMatrix * childMatrix" to "worldMatrix = ... grandParentMatrix * parentMatrix * childMatrix * grandChildMatrix ..."
-
-		
-		
-		
-		GLuint worldMatrixLocation = glGetUniformLocation(shaderProgram, "worldMatrix");
-		
-
-		// drawing the feet left
-		glm::mat4 scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.2f, -0.2f, 0.175f));
-		glm::mat4 translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(-0.15f, 0.1f, 0.0f));
-
-		partMatrix = translationMatrix * scalingMatrix;
-		worldMatrix = bodyMatrix * partMatrix;
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
-		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
-
-		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
-
-		// drawing the feet right
-		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.2f, -0.2f, 0.175f));
-		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.15f, 0.1f, 0.0f));
-
-		partMatrix = translationMatrix * scalingMatrix;
-		worldMatrix = bodyMatrix * partMatrix;
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
-		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
-
-		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
-
-
-		// drawing the body
-		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.6f, -1.0f, 0.2f));
-		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.6f, 0.0f));
-
-		partMatrix = translationMatrix * scalingMatrix;
-		worldMatrix = bodyMatrix * partMatrix;
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
-		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
-
-		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
-
-		// drawing the body upper
-		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.4f, -0.25f, 0.2f));
-		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.2f, 0.0f));
-
-		partMatrix = translationMatrix * scalingMatrix;
-		worldMatrix = bodyMatrix * partMatrix;
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
-		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
-
-		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
-
-		// drawing the head
-		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.3f, 0.25f, 0.2f));
-		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.4f, 0.0f));
-
-		partMatrix = translationMatrix * scalingMatrix;
-		worldMatrix = bodyMatrix * partMatrix;
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
-		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
-
-		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
-
-		// drawing the nose
-		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.05f, 0.05f, 0.05f));
-		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.4f, 0.1f));
-
-		partMatrix = translationMatrix * scalingMatrix;
-		worldMatrix = bodyMatrix * partMatrix;
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
-		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 0.0, 1.0)));
-
-		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
-
-		// drawing the hat
-		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(0.1f, -0.25f, 0.1f));
-		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.6f, 0.0f));
-
-		partMatrix = translationMatrix * scalingMatrix;
-		worldMatrix = bodyMatrix * partMatrix;
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
-		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 0.0, 0.0)));
-
-		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
-
-		// drawing the left arm
-		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, -0.075f, 0.1f));
-		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(-0.4f, 1.2f, 0.0f));
-
-		partMatrix = translationMatrix * scalingMatrix;
-		worldMatrix = bodyMatrix * partMatrix;
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
-		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
-
-		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
-
-		// drawing the right arm
-		scalingMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, -0.075f, 0.1f));
-		translationMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.4f, 1.2f, 0.0f));
-
-		partMatrix = translationMatrix * scalingMatrix;
-		worldMatrix = bodyMatrix * partMatrix;
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &worldMatrix[0][0]);
-		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 1.0, 1.0)));
-
-		glDrawArrays(GL_TRIANGLES, 0, 36); // 3 vertices, starting at index 0
-
-		
-
-		
-		
-
-		//grid
-		glBindVertexArray(vbo_grid);
-		glLineWidth(1.0f);
-
-
-
-		
-
-		mat4 gridWorldMatrix = mat4(1.0f);
-		for (int i = 0; i < 50; i++) {
-			gridWorldMatrix = translate(mat4(1.0f), vec3(0.0f , 0.0f, 0.0f + i * 0.1f) );
-			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &gridWorldMatrix[0][0]);
-			glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 0.0)));
-			glDrawArrays(GL_LINES, 0, 2);	
-
-			gridWorldMatrix = translate(mat4(1.0f), vec3(0.0f, 0.0f, -0.0f + i * -0.1f));
-			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &gridWorldMatrix[0][0]);
-			glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 0.0)));
-			glDrawArrays(GL_LINES, 0, 2);
-		}
-
-		
-		
-		mat4 rotatemat = rotate(gridWorldMatrix, radians(90.0f), vec3(0.0f, 1.0f, 0.0f));
-		
-		for (int i = 0; i < 50; i++) {
-			
-			gridWorldMatrix = translate(mat4(1.0f), vec3(0.0f + i * 0.1f, 0.0f,5.0f )) * rotatemat;
-			
-			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &gridWorldMatrix[0][0]);
-			glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 0.0)));
-			glDrawArrays(GL_LINES, 0, 2);
-
-			
-			gridWorldMatrix = translate(mat4(1.0f), vec3(-0.0f + i * -0.1f, 0.0f, 5.0f)) * rotatemat;
-
-			
-			glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &gridWorldMatrix[0][0]);
-			glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 0.0)));
-			glDrawArrays(GL_LINES, 0, 2);
-		}
-
-		// axis 
-
-		glBindVertexArray(vbo_axis);
-		glLineWidth(5.0f);
-		mat4 axis_mat = mat4(1.0f) ;
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &axis_mat[0][0]);
-		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 0.5, 1.0)));
-		glDrawArrays(GL_LINES, 0, 2);
-
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &axis_mat[0][0]);
-		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(0.0, 1.0, 1.0)));
-		glDrawArrays(GL_LINES, 2, 4);
-
-		glUniformMatrix4fv(worldMatrixLocation, 1, GL_FALSE, &axis_mat[0][0]);
-		glUniform3fv(colorLocation, 1, glm::value_ptr(glm::vec3(1.0, 0.0, 1.0)));
-		glDrawArrays(GL_LINES, 4, 6);
-
-
-
-		
-
-		
-
-		
-
-
-
-		// End Frame
-		glfwSwapBuffers(window);
-		
-
-		// Detect inputs
-		glfwPollEvents();
-
-		//Handle inputs
-		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-			glfwSetWindowShouldClose(window, true);
 
 
 		// World Transform
@@ -1189,15 +1521,15 @@ GLuint loadTexture(const char *filename)
 	GLuint textureId = 0;
 	glGenTextures(1, &textureId);
 	assert(textureId != 0);
-
+	
 
 	glBindTexture(GL_TEXTURE_2D, textureId);
 
 	// Step2 Set filter parameters
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	// Step3 Load Textures with dimension data
 	int width, height, nrChannels;
@@ -1224,3 +1556,4 @@ GLuint loadTexture(const char *filename)
 	glBindTexture(GL_TEXTURE_2D, 0);
 	return textureId;
 }
+
